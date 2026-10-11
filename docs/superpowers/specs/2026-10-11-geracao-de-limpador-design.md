@@ -1,0 +1,395 @@
+# Design: POC 2 — geração de limpador de dados tabulares
+
+Data: 11/10/2026. Status: aprovado no brainstorming, seção por seção.
+Decisões e justificativas em [`docs/DECISOES.md`](../../DECISOES.md). Regras de
+negócio em linguagem de usuário em [`docs/REGRAS_DO_LIMPADOR.md`](../../REGRAS_DO_LIMPADOR.md).
+
+---
+
+## 1. Problema
+
+A POC 1 gera limpadores precisos e tímidos: precisão de 100% e recall de 24,4%
+no `beers` e 13,2% no `environment` (`HANDOFF.md` §3). O gargalo é recall, e ele
+tem três causas medidas:
+
+1. Detecção valor a valor não alcança erro que depende da linha. No
+   `environment`, 21,5% dos erros são inalcançáveis por regra intra-coluna.
+2. Quando o erro é inalcançável, a regra degenera em marcar a coluna inteira, o
+   que envenena qualquer camada posterior que precise de linhas limpas.
+3. O que a regra detecta e não repara vira flag, e flag é recall perdido.
+   `Measurement_Date` teve detecção com precisão e recall de 100% e correção de
+   0%.
+
+A literatura do mapeamento confirma a causa 3 com uma medida direta: a ablação
+do ZeroEC sem o passo residual dá precisão de 1,00 e recall de 0,70 no Hospital
+e 0,00 no Rayyan. Com o residual, F1 de 0,99 no Beers e 0,83 no `environment`.
+
+## 2. Objetivo e não objetivos
+
+**Objetivo.** Gerar, a partir do CSV sujo e de um guia pequeno, um script Python
+autônomo que repare mais erros que a POC 1 sem perder precisão, e medir a
+qualidade desse script executando-o.
+
+**Não objetivos**, que ficam fora desta POC e pertencem ao framework do capítulo
+4 da qualificação: reuso de modelos por metadados, PostgreSQL, loop de feedback
+humano, interface self-service, RAG institucional, Pandera, Ollama como padrão,
+auditor e documentador como módulos institucionais, estudo de caso do SEADE,
+medição de eficiência e de memória.
+
+**Divergência declarada em relação à proposta de mestrado.** A proposta tem dois
+agentes (gerador de prompt com CoT e gerador de código). Esta POC tem três:
+detector e especificador juntos ocupam o lugar do gerador de prompt.
+
+## 3. Entradas, saídas e o que nunca é lido
+
+| Fase | Entra | Sai |
+|---|---|---|
+| Geração | `<ds>_dirty_300.csv` e, opcionalmente, `guia_linhas.csv` + `guia_pares.csv` | `limpador_<ds>_<carimbo>.py` e `raciocinio_<ds>_<carimbo>.md` |
+| Validação | o limpador gerado, o sujo e `<ds>_clean*.csv` | precisão, recall, F1, flags e decomposição por fonte |
+
+**O CSV limpo nunca é lido pela geração.** Garantia estrutural: `gabarito.py` é o
+único módulo do projeto que o abre, e ele fica fora do pacote `limpeza2/`. O
+teste de vazamento assevera que nenhum módulo de `limpeza2/` importa `gabarito` e
+que nenhum abre caminho de arquivo que não seja o sujo ou os dois CSVs do guia.
+
+**Os arquivos de restrição do benchmark** (`FunctionalDependency.txt`,
+`TypeConstraint.txt`) e o `real_examples.txt` **não são lidos em nenhuma fase**.
+As dependências são mineradas do sujo. Os arquivos do benchmark servem apenas
+para conferência manual posterior, fora do código.
+
+## 4. Datasets
+
+Desenvolvimento e comparação com o placar: `beers_dirty_300.csv` e
+`environment_dirty_300.csv` de `C:\Users\gusta\projects\Limpeza_de_Dados\ZeroDC\datasets`.
+Verificado: são byte a byte idênticos às fixtures da POC 1, então a comparação
+vale.
+
+Generalização: as linhas restantes do arquivo completo — 700 no `environment` e
+2.110 no `beers`. Verificado que as 300 linhas são subconjunto do arquivo
+completo em ambos. No `beers`, o arquivo de 300 grafa `beer-name` e
+`brewery-name` com hífen, e o completo com sublinhado; a fatia nunca vista é
+renomeada para a grafia com hífen antes de rodar o limpador.
+
+Depois, como generalização entre datasets: `hospital`, `flights` e `rayyan`.
+
+## 5. Arquitetura
+
+### 5.1 Árvore de módulos
+
+```
+limpeza2/
+  tipos.py              # o que viaja entre etapas
+  config.py             # modelo, caminhos, limiares, semente
+  provedor.py           # cliente de LLM; PROVEDOR desconhecido falha alto
+  portao.py             # AST com allowlist + namespace descartavel
+  motor.py              # UNICA implementacao de aplicacao de regra
+  e1_perfil.py          # etapa 1: carga literal + perfil por coluna e por par
+  e2_detector.py        # etapa 2: agente detector -> predicados candidatos
+  e3_crivo.py           # etapa 3: portao deterministico, sem LLM e sem gabarito
+  e4_especificador.py   # etapa 4: agente especificador -> JSON de reparo
+  e5_residual.py        # etapa 5: rodada residual por entidade -> dicionario
+  e6_codificador.py     # etapa 6: agente codificador -> escreve limpador e raciocinio
+  espinha.py            # a ordem das etapas, e nada mais
+gabarito.py             # fora do pacote: o UNICO modulo que abre o CSV limpo
+```
+
+Treze arquivos, exatamente o teto do `CLAUDE.md` §2. Sem folga: declarado como
+risco em §11. Válvula, se houver necessidade de um décimo quarto: dobrar
+`portao.py` dentro de `e6_codificador.py`.
+
+### 5.2 A espinha
+
+```python
+def gerar_limpador(caminho_sujo, caminho_guia, destino):
+    """Etapas 1 a 6 em ordem: a unica sequencia do projeto."""
+    entrada = e1_perfil.perfilar(caminho_sujo, caminho_guia)
+    candidatas = e2_detector.propor(entrada)
+    deteccoes = e3_crivo.crivar_deteccao(candidatas, entrada)
+    propostas = e4_especificador.especificar(deteccoes, entrada)
+    reparos = e3_crivo.crivar_reparo(propostas, entrada)
+    residual = e5_residual.resolver(reparos, entrada)
+    return e6_codificador.escrever(reparos, residual, entrada, destino)
+```
+
+O crivo aparece duas vezes de propósito: o controle negativo das linhas limpas
+do guia vale tanto para a regra que detecta quanto para a que repara. É o que
+justifica ele ser módulo próprio.
+
+A validação não está na espinha, porque é a outra fase:
+`gabarito.medir(caminho_limpador, sujo, limpo, guia)`.
+
+### 5.3 Tipos que viajam
+
+Quatro dataclasses em `tipos.py`:
+
+| Tipo | Campos |
+|---|---|
+| `Entrada` | `sujo: DataFrame`, `guia_linhas: DataFrame`, `guia_pares: DataFrame`, `perfil: Perfil`, `coluna_sujeito: str` |
+| `Candidata` | `coluna`, `tipo`, `parametros: dict`, `raciocinio: str`, `metricas_crivo: dict` |
+| `Reparo` | `candidata: Candidata`, `estrategia`, `parametros: dict`, `raciocinio: str`, `codigo: str \| None` |
+| `Residual` | `coluna`, `mapa: dict[str, str]`, `justificativas: dict[str, str]` |
+
+`Perfil` é um dicionário com duas chaves: `colunas` (por coluna) e `pares` (por
+par ordenado de colunas).
+
+### 5.4 Fonte única da lógica de aplicação
+
+`motor.py` é a única implementação de "aplicar uma regra". O crivo o importa; o
+codificador copia o texto-fonte dele inteiro para dentro do limpador, porque o
+limpador não pode depender deste repositório. Um teste assevera que o trecho
+embutido é byte a byte igual a `motor.py`.
+
+Esta é a resposta à lição mais cara da POC 1 (`CLAUDE.md` §4). Não existe uma
+segunda implementação mantida à mão: existem os mesmos bytes em dois lugares,
+com igualdade verificada.
+
+## 6. As etapas
+
+### Etapa 1 — perfil (determinística)
+
+Carga como texto literal: `pd.read_csv(p, dtype=str, keep_default_na=False, na_values=[])`.
+
+Por coluna: número de distintos e de vazios, os 15 valores mais frequentes e os
+10 mais raros com contagem, e os padrões em três níveis de generalização com
+frequência (nível 1 classe por caractere, nível 2 classes com contagem de
+repetição, nível 3 sequência de classes sem contagem).
+
+Por par ordenado de colunas `(A, B)`, quatro números calculados só no sujo:
+
+| Número | Definição |
+|---|---|
+| `det(A→B)` | soma, sobre os grupos de `A` com suporte ≥ 2, da contagem da moda de `B`, dividida pelo total de linhas nesses grupos |
+| `n_grupos` | quantidade de grupos de `A` com suporte ≥ 2 |
+| `n_divergentes` | células de `B` que divergem da moda do seu grupo |
+| `frac_ambiguos` | fração dos grupos em que a moda de `B` não atinge o limiar de dominância |
+
+`frac_ambiguos` é o perfil que reprova a dependência ambígua de `flights`
+(`flight → act_arr_time`, em que quatro horários concorrem para o mesmo voo),
+sem precisar do gabarito.
+
+**Coluna-sujeito.** O perfil propõe as três colunas com determinação alta sobre
+o maior número de outras colunas; uma chamada de LLM escolhe qual nomeia a
+entidade. Minerar e deixar o LLM julgar, como o Cocoon faz com dependências.
+
+### Etapa 2 — detector (uma chamada de LLM por coluna)
+
+O prompt leva: o schema completo; o perfil compacto daquela coluna, em uma linha
+por item, no estilo do catálogo do CatDB; os pares candidatos em que a coluna é o
+lado determinado, com os quatro números acima; as linhas limpas do guia; e os
+pares `sujo → limpo` que caem naquela coluna.
+
+Devolve candidatas de um **catálogo fechado de cinco tipos**, em ordem de
+abrangência crescente (ordem do Cocoon: caractere, padrão, ausente, entre
+colunas):
+
+| Tipo | Parâmetro emitido pelo LLM |
+|---|---|
+| `formato` | uma regex que o valor válido casa |
+| `dominio` | a lista de valores válidos |
+| `faixa` | mínimo e máximo |
+| `ausente_disfarcado` | a lista de sentinelas |
+| `dependencia` | as colunas determinantes desta |
+
+Nenhum parâmetro passa de vinte tokens. É o que impede o estouro de saída que
+quebrou `Eco_Status` na POC 1 com `LengthFinishReasonError`. As três variantes
+de cada tipo vêm **numa única chamada** por coluna, como lista, não em três
+chamadas — o rephraser do ZeroEC gasta três chamadas, e aqui a saída é curta o
+bastante para caber numa.
+
+Como a tabela é carregada só como texto, `faixa` converte com tentativa de
+`float`: valor não convertível **não** é marcado por `faixa`, e sim pelo tipo
+`formato`, para que cada célula marcada tenha um motivo único e rastreável.
+
+### Etapa 3 — crivo (determinística, sem LLM e sem gabarito)
+
+Executa cada candidata sobre o sujo pelo `motor.py` e aplica cinco testes:
+
+| # | Teste | Reprova quando | Lição que endereça |
+|---|---|---|---|
+| 1 | controle negativo | marca qualquer célula das linhas limpas do guia | `CLAUDE.md` §1 |
+| 2 | não-vacuidade | marca zero células no sujo | lição 6 |
+| 3 | teto de marcação | marca mais que `TETO_MARCACAO` da coluna | lição 4 |
+| 4 | piso do guia | há pares na coluna e a regra não marca todos | — |
+| 5 | ambiguidade (só `dependencia`) | `frac_ambiguos` acima do limiar | — |
+
+Entre as variantes sobreviventes do mesmo tipo fica a de **menor taxa de
+marcação** que ainda passa no teste 4. Tipos diferentes na mesma coluna
+coexistem, e a máscara final é a união.
+
+Em coluna sem par no guia, o teste 4 não se aplica, e os testes 1 a 3 decidem
+sozinhos. É isso que substitui o gate de 100% da POC 1, que passava por
+vacuidade.
+
+`TETO_MARCACAO` **não pode ser calibrado**: olhar a taxa real de erro por coluna
+para escolher o número seria ler o gabarito. Fica fixado *a priori* em 30%, com
+a justificativa escrita em `docs/DECISOES.md`. Consequência declarada: coluna com
+mais de 30% de erro é subdetectada, e isso é limite do método, não defeito.
+
+### Etapa 4 — especificador (uma chamada por detecção aprovada)
+
+Devolve JSON curto com a estratégia de reparo, de catálogo fechado:
+
+| Estratégia | Parâmetro | Quando serve |
+|---|---|---|
+| `normalizar` | a transformação pedida em linguagem estruturada | formato previsível |
+| `moda_condicionada` | colunas determinantes e limiar de dominância | dependência entre colunas |
+| `vizinho_no_dominio` | distância máxima de edição | valor fora do domínio observado com vizinho próximo |
+| `dicionario` | pares literais `{sujo: limpo}` | o que não é parametrizável |
+| `esvaziar` | — | sentinela que deve virar vazio |
+
+Mais `raciocinio` em três frases, no molde CoT do ZeroEC: padrão identificado,
+análise do erro, transformação.
+
+**Qual lado da violação está errado.** Para `moda_condicionada`, a regra padrão
+repara o lado determinado. Exceção, da versão barata do BClean+: se o valor do
+determinante ocorre uma única vez na coluna e existe outro valor de determinante
+a distância de edição 1 com grupo de suporte ≥ 2, o erro está no determinante, e
+é ele que é corrigido. Recupera erro de digitação na chave, que a dependência
+orientada perderia.
+
+Depois, `crivar_reparo` reprova a estratégia que altere célula das linhas limpas
+do guia, que não reproduza os pares daquela coluna, ou que repare zero células
+detectadas.
+
+### Etapa 5 — residual (a aposta de recall)
+
+Sobram células detectadas que nenhuma estratégia reparou. Na POC 1 elas viravam
+flag.
+
+1. Junta os **valores distintos** que sobraram, não as células.
+2. Agrupa os lotes de prompt pela coluna-sujeito, para o LLM ver num mesmo
+   prompt todas as linhas da mesma entidade e notar a redundância entre elas.
+   É a peça do IterClean, cuja ablação mostra o F1 do `flights` caindo de 0,595
+   para 0,164 com grupos aleatórios.
+3. Devolve `{valor_sujo: valor_limpo}` com justificativa por entrada, e `null`
+   onde não sabe.
+4. Passa pelo mesmo crivo: nenhuma entrada pode alterar célula limpa do guia.
+5. É congelado como literal no limpador. Nenhuma chamada de LLM em execução.
+
+**Limitação declarada.** O dicionário é por coluna e valor. Cobre qualquer linha
+futura que repita o mesmo valor sujo, e não cobre valor sujo inédito numa tabela
+nova — aí só as regras valem. Consequência: rodar a POC inteira num dataset novo
+é estritamente mais poderoso que rodar o limpador congelado nele. É a troca que
+o princípio de converter conhecimento do LLM em artefato reexecutável impõe, e é
+por isso que a métrica mede em dois lugares (§8).
+
+### Etapa 6 — codificador
+
+Recebe reparos e residual e escreve dois arquivos.
+
+`limpador_<ds>_<carimbo>.py`: cabeçalho avisando que roda sem portão; `import
+pandas`; o texto-fonte de `motor.py` embutido; os parâmetros como literais
+(regexes, domínios, dicionários, determinantes, limiares); as funções escalares
+`corrigir_*(valor) -> str` escritas pelo LLM; `limpar(df) -> (df, mascara_flags)`;
+e um `main` que lê e escreve CSV.
+
+`raciocinio_<ds>_<carimbo>.md`: por coluna e por regra, os números do crivo
+(células marcadas, taxa, `det`, `n_grupos`, `frac_ambiguos`) e o CoT de três
+frases. Inclui as regras **reprovadas** e o motivo, porque é o que torna a
+vacuidade visível.
+
+O único Python escrito pelo LLM são as funções escalares de normalização. Todo o
+resto é `motor.py` parametrizado. Funções escalares não precisam de pandas, o que
+casa com o portão da POC 1, que mantém `pd` fora do namespace e oferece `re`.
+
+## 7. Guia
+
+`gabarito.sortear_guia(dataset, semente)` grava, em `dados/guia/<ds>/`:
+
+- `guia_linhas.csv`: 20 linhas sorteadas entre as que estão 100% corretas.
+- `guia_pares.csv`: colunas `linha, coluna, sujo, limpo`, até 2 pares por coluna
+  que tem erro.
+
+Semente fixa em `config.py`. Gerado uma vez e commitado. A geração lê os CSVs,
+nunca executa o sorteio.
+
+**Braço sem guia:** a mesma espinha com os dois CSVs vazios. Os testes 1 e 4 do
+crivo não se aplicam, e sobram a não-vacuidade e o teto. A diferença entre os
+braços é quanto o guia vale.
+
+## 8. Medição
+
+Fórmula idêntica à do `avaliar_limpador.py` da POC 1, para a comparação valer:
+precisão igual a alterações corretas sobre alterações, recall igual a alterações
+corretas sobre erros, F1 harmônico, mais a contagem de flags.
+
+Calculada **executando o arquivo gerado**. O holdout tira da métrica toda linha
+que apareceu no guia: as 20 limpas e as linhas dos pares. O número de linhas
+descontadas é publicado ao lado de cada F1.
+
+Dois locais de medição, ambos publicados:
+
+| Onde | O que mede | Compara com |
+|---|---|---|
+| as 300 linhas da geração, menos o holdout | o limpador na tabela de origem | o placar da POC 1: 24,4% e 13,2% de recall |
+| as 700 (`environment`) e 2.110 (`beers`) linhas nunca vistas | o limpador como programa, não como tabela de consulta | número novo |
+
+Mais a **decomposição do recall por fonte**: quantas correções vieram de cada
+tipo de regra e quantas do dicionário residual. A diferença entre os dois locais
+de medição, lida junto da decomposição, é a medida da memorização.
+
+## 9. Resiliência e segurança
+
+Uma fronteira de resiliência por coluna, não várias paralelas. Cada `try` tem
+degradação nomeada:
+
+| Onde | Falha | Degradação |
+|---|---|---|
+| etapa 2 e 4 | o LLM devolve JSON inválido ou estoura | a coluna fica sem aquela regra |
+| etapa 3 | a regra lança ao ser aplicada | a candidata é reprovada e o motivo vai ao Markdown |
+| etapa 6 | a função escalar não passa no portão | a regra cai, a coluna segue com as demais |
+| limpador | a função lança numa célula | a célula vira flag |
+
+Portão AST adaptado de `../POC_Limpeza_de_Dados/limpeza/sandbox.py` (142 linhas):
+allowlist de builtins, proibição de `import`, dunder, `eval`, `exec`, `compile`,
+`open`, `getattr` e companhia, execução em namespace descartável com `re`
+disponível e `pd` fora. O limpador gerado roda **sem** o portão na máquina do
+usuário, e o cabeçalho dele avisa isso.
+
+`provedor.py` lê `PROVEDOR` do `.env`; valor desconhecido levanta exceção e
+nunca cai para OpenAI, porque isso mandaria a tabela do usuário para fora da
+rede. Provedor desta POC: OpenAI, modelo `gpt-5.6-luna`, nome em `.env`.
+
+## 10. Testes
+
+Nenhum teste gasta API: os três agentes são substituídos por um dublê de
+provedor que devolve JSON fixo.
+
+Um teste por etapa, mais quatro que são rede de segurança:
+
+1. **Vazamento**: nenhum módulo de `limpeza2/` importa `gabarito`; nenhum abre
+   caminho de arquivo fora do sujo e dos dois CSVs do guia.
+2. **Portão**: código com `import`, dunder, `eval` e `open` é rejeitado sem ser
+   executado.
+3. **Identidade do motor**: o trecho embutido no limpador é byte a byte igual a
+   `motor.py`.
+4. **Invariante**: o primeiro limpador que preste é congelado em
+   `tests/fixtures/` e seus números viram teste. Mudar esses números é bug, a
+   menos que o usuário decida que é mudança de comportamento, com entrada nova
+   em `docs/DECISOES.md` e fixture nova.
+
+Todo teste novo vem com prova por mutação, e a mutação usada é registrada.
+
+## 11. Riscos
+
+| Risco | Medida |
+|---|---|
+| 13 arquivos é exatamente o teto, sem folga | válvula declarada: dobrar `portao.py` dentro de `e6_codificador.py` |
+| `e6_codificador.py` perto de 190 linhas | se estourar, encolhe o catálogo de tipos, não a formatação |
+| o código gerado decora o vocabulário de erros do guia (um estudo mede F1 de 23,5 na detecção do Hospital por isso) | o crivo mede a regra na tabela suja inteira, não nos exemplos; o teste 3 pune a regra agressiva |
+| `gpt-5.6-luna` é mais novo que o conhecimento do assistente | nome em `.env`; formato de saída confirmado contra a API na primeira chamada |
+| o residual infla o F1 na tabela de origem | medição nos dois locais e decomposição por fonte |
+| `TETO_MARCACAO` escolhido sem calibração | fixado a priori com justificativa; limite declarado |
+
+## 12. Como esta POC se compara, e por que a comparação favorece a POC 1
+
+A POC 1 teve mais supervisão: cerca de 10 células rotuladas por coluna,
+sorteadas do limpo completo, mais o que o oráculo rotulou em 5 iterações de
+refino. Esta POC recebe no máximo o guia. **Empatar com a POC 1 usando menos
+rótulo já é avanço**, e o tamanho do guia é reportado junto de cada número.
+
+Os números dos papers não são alvo comparável. O ZeroDC reporta F1 de 1,00 em
+Hospital e Beers, mas cerca de 60% do resultado dele vem de um laço de 10
+anotações por coluna que, no código publicado, são simuladas lendo o
+`_clean.csv`. CodeGenWrangler e CatDB validam contra splits rotulados grandes.
+Nenhum desses sinais de validação está disponível aqui.

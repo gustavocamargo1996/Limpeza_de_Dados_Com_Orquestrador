@@ -1,0 +1,7 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+limpador_*.py
+raciocinio_*.md
+!tests/fixtures/limpador_*.py

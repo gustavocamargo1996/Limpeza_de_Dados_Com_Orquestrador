@@ -256,7 +256,7 @@ limpeza2/
   config.py             # modelo, caminhos, limiares, semente
   provedor.py           # entrega o cliente do provedor de LLM escolhido
   portao.py             # valida o Python gerado antes de deixa-lo rodar
-  motor.py              # UNICA implementacao de aplicacao de regra (inclui `padrao`)
+  motor.py              # UNICA implementacao de aplicacao de regra (inclui padrao e aplicar_regras)
   conformidade.py       # deriva o schema de cada coluna das celulas que o guia certificou
   limites.py            # calcula os limites que o guia sustenta para uma coluna
   e1_perfil.py          # etapa 1: perfila a tabela suja, lida como texto literal
@@ -265,7 +265,7 @@ limpeza2/
   e4_especificador.py   # etapa 4: agente especificador -> JSON de reparo
   e5_residual.py        # etapa 5: rodada residual por entidade -> dicionario
   e6_codificador.py     # etapa 6: agente codificador -> escreve os artefatos de saida
-  espinha.py            # a ordem das etapas, e nada mais
+  espinha.py            # a ordem das etapas, e nada mais (e o CLI de geracao)
 preparar_guia.py        # fora do pacote: sorteia o guia com semente fixa
 medir.py                # fora do pacote: executa o limpador gerado e mede
 ```
@@ -284,25 +284,35 @@ torna o §1 verificável: nenhum módulo de `limpeza2/` importa `preparar_guia` 
 ```python
 def gerar_limpador(caminho_sujo, caminho_guia, destino):
     """Etapas 1 a 6 em ordem: a unica sequencia do projeto."""
+    provedor.iniciar(destino)
     entrada = e1_perfil.perfilar(caminho_sujo, caminho_guia)
-    candidatas = e2_detector.propor(entrada)
-    deteccoes = e3_crivo.crivar_deteccao(candidatas, entrada)
+    conformes = conformidade.candidatas_de_conformidade(entrada)
+    schema = e3_crivo.crivar_deteccao(conformes, entrada)
+    candidatas = e2_detector.propor(entrada, schema, conformes)
+    deteccoes = e3_crivo.crivar_deteccao(schema + candidatas, entrada)
     propostas = e4_especificador.especificar(deteccoes, entrada)
-    reparos = e3_crivo.crivar_reparo(propostas, entrada)
-    residual = e5_residual.resolver(reparos, entrada)
-    return e6_codificador.escrever(reparos, residual, entrada, destino)
+    codificadas, funcoes = e6_codificador.codificar(propostas, entrada)
+    reparos = e3_crivo.crivar_reparo(codificadas, entrada, funcoes)
+    sugestoes = e5_residual.resolver(deteccoes, reparos, funcoes, entrada)
+    residual = e3_crivo.crivar_residual(sugestoes, entrada)
+    return e6_codificador.escrever(
+        deteccoes, reparos, residual, conformes + candidatas, entrada, destino
+    )
 ```
 
-O crivo aparece duas vezes porque o controle negativo do guia vale para a regra
-que detecta e para a que repara. A validação não está na espinha: é a outra
-fase, `medir.medir(...)`.
+O crivo aparece quatro vezes: sobre a conformidade, para o detector saber onde ela
+já cobre a forma; sobre todas as detecções; sobre os reparos; e sobre o dicionário
+residual. O codificador aparece duas: escreve as funções `corrigir` antes do crivo
+do reparo, que precisa delas, e monta os arquivos no fim. A validação não está na
+espinha: é a outra fase, `medir.avaliar(...)`. Detalhe na spec da parte 2.
 
 ### Tipos que viajam (`tipos.py`)
 
-`Entrada` (sujo, guia_linhas, guia_pares, perfil; `coluna_sujeito` fica para a parte 2, ainda não está em `tipos.py`) ·
+`Entrada` (sujo, guia_linhas, guia_pares, perfil) ·
 `Candidata` (coluna, tipo, parametros, raciocinio, metricas) ·
 `Reparo` (candidata, estrategia, parametros, raciocinio, codigo) ·
-`Residual` (coluna, mapa, justificativas).
+`Residual` (coluna, mapa, justificativas, caidas) ·
+`regras_literais(deteccoes, reparos)`, a forma em que as regras viajam até o limpador.
 
 ### A estratégia de cada agente
 

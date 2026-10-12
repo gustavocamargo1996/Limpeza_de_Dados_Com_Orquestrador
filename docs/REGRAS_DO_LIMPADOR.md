@@ -423,6 +423,16 @@ Isso significa que **parte do que o limpador sabe é memória, não padrão**. P
 isso a medição acontece em dois lugares e o recall é decomposto por fonte. A
 diferença entre os dois números é o tamanho da memorização, e ela é publicada.
 
+O dicionário não é a única memória. O **domínio** da estratégia
+`vizinho_no_dominio` — os valores da coluna que aparecem duas ou mais vezes sem
+marca, mais os que o guia certifica — também é calculado na tabela de geração e
+congelado no limpador. Numa tabela nova, um valor válido que nunca apareceu na de
+geração não está nele.
+
+No **braço sem guia**, o dicionário entra no limpador sem filtro nenhum: as três
+condições que derrubam uma entrada dependem do guia. Os números desse braço medem,
+entre outras coisas, o residual sem supervisão.
+
 ---
 
 ## 8. Como a qualidade é medida

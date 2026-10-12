@@ -12,25 +12,38 @@ resumida. Leia junto com o `CLAUDE.md` e o `docs/DECISOES.md`.
 
 ---
 
-## 1. O que existe e está em `main`
+## 1. O que existe e está em `parte-2-agentes`
 
-A **fundação determinística** da POC 2, mesclada em `main`, com 174 testes
-passando e saída limpa (hoje 186 após as duas mudanças da seção 3 e 4). Onze arquivos `.py` fora de `tests/`, 940 linhas, maior
-com 179.
+A **parte 2 está implementada e testada com dublê**: os três agentes, o residual,
+a espinha e o CLI de geração. **Nenhuma chamada de API foi feita.** Medido: 16
+arquivos `.py` fora de `tests/` (16 de 16, folga zero), 1.772 linhas no total
+(teto 1.800), e o maior, `limpeza2/e6_codificador.py`, com 200 linhas, exatamente
+no teto. A suíte completa: 282 testes passando. A seção 2 do `CLAUDE.md` declara
+que isto é dois terços da POC 1, e não a metade pedida no começo.
 
 | Arquivo | Função |
 |---|---|
 | `limpeza2/tipos.py` | o que viaja entre etapas |
-| `limpeza2/config.py` | caminhos, limiares, semente |
+| `limpeza2/config.py` | modelo, caminhos, limiares, semente |
+| `limpeza2/provedor.py` | entrega o cliente do provedor escolhido (`openai`, `ollama`, `gravado`) |
 | `limpeza2/portao.py` | valida o Python gerado por LLM antes de deixá-lo rodar |
-| `limpeza2/motor.py` | única implementação de aplicação de regra: 5 tipos de detecção, 5 estratégias de reparo |
+| `limpeza2/motor.py` | única implementação de aplicação de regra |
+| `limpeza2/conformidade.py` | deriva o schema de cada coluna das células certificadas |
 | `limpeza2/limites.py` | o que o guia sustenta para uma coluna |
 | `limpeza2/e1_perfil.py` | etapa 1: perfila a tabela suja |
-| `limpeza2/e3_crivo.py` | etapa 3: reprova a regra candidata que não se sustenta |
+| `limpeza2/e2_detector.py` | etapa 2: agente detector |
+| `limpeza2/e3_crivo.py` | etapa 3: reprova a regra que não se sustenta (detecção, reparo, residual) |
+| `limpeza2/e4_especificador.py` | etapa 4: agente especificador |
+| `limpeza2/e5_residual.py` | etapa 5: rodada residual por entidade |
+| `limpeza2/e6_codificador.py` | etapa 6: agente codificador e escrita dos artefatos |
+| `limpeza2/espinha.py` | a ordem das etapas e o CLI de geração |
 | `preparar_guia.py` | sorteia o guia com semente fixa |
 | `medir.py` | executa o limpador gerado e mede |
 
-**Nada chama LLM ainda.** Os três agentes são a parte 2.
+**O modelo mudou para `gpt-6-luna`** com `reasoning_effort="none"`, em 12/10/2026
+(`docs/DECISOES.md#provedor`). A POC 1 rodou com `gpt-4o-mini`, então **toda
+comparação com o placar dela muda método e modelo ao mesmo tempo**, e a diferença
+não se atribui só ao método.
 
 A métrica reproduz o placar da POC 1 exato — `beers` 495/121/121 com recall de
 24,4%, `environment` 334/44/44 com 13,2% — e esse teste existe para provar que a
@@ -124,8 +137,8 @@ limiar olhando a resposta; fica como decisão do usuário.
 Implementado em `limpeza2/conformidade.py` (`schema_da_coluna`,
 `candidatas_de_conformidade`), no tipo `conformidade` de `motor.py` (com `padrao`
 movida para lá) e na exceção do teto em `e3_crivo.py`. Âncora:
-`docs/DECISOES.md#conformidade-de-schema`. A espinha ainda não existe: a parte 2
-chama `candidatas_de_conformidade` antes do crivo. Reproduziu todos os números
+`docs/DECISOES.md#conformidade-de-schema`. A espinha chama `candidatas_de_conformidade`
+antes do crivo. Reproduziu todos os números
 da tabela acima. O problema das colunas sem erro e de largura variável foi resolvido pelo nível 3 (ver acima).
 
 Uma etapa **determinística antes do detector**, no espírito do CatDB:
@@ -206,24 +219,24 @@ aparece.
 - `valores_certificados` ignora os `limpo` de `guia_pares.csv` fora das 20 linhas.
 - Empate de taxa entre variantes do mesmo `(coluna, tipo)` depende da ordem da
   lista.
-- `limpeza2/__init__.py` está vazio e a suíte passa sem ele: é a vaga livre se a
-  parte 2 precisar de um 17º arquivo.
+- `limpeza2/__init__.py` foi apagado para abrir a 16ª vaga; não resta vaga livre.
 
 ## 7. O que vem depois, em ordem
 
-1. **A parte 2:** `provedor.py`, `e2_detector.py`, `e4_especificador.py`,
-   `e5_residual.py`, `e6_codificador.py`, `espinha.py`. Seis arquivos, teto de 16.
-2. Duas recomendações da revisão final para a parte 2: o teste de vazamento **em
-   tempo de execução**, instrumentando `pandas.read_csv` e exigindo que todo
-   caminho aberto seja o sujo ou o guia; e o codificador deve **ler `motor.py` do
-   disco** e concatenar, nunca guardar template com o texto do motor dentro, para
-   a identidade byte a byte ser verdadeira por construção.
-3. O primeiro run pago. **Nenhuma chamada de API foi feita nesta sessão.**
-   Estimativa: cerca de 60 chamadas por dataset por braço, com `gpt-5.6-luna`.
-   Anunciar antes.
-4. A espinha deve chamar `candidatas_de_conformidade` e entregar as candidatas ao
-   crivo junto com as do detector; o detector só é chamado para as colunas sem
-   schema. Decidir o que fazer com coluna de schema sem erro (`brewery-name`, 31 marcadas, precisão 0,000) e o corte de um quarto.
+Todo degrau pago é **anunciado ao usuário e aprovado por ele antes de disparar**.
+
+1. **Sonda, uma só chamada.** Confirma no `gpt-6-luna` com
+   `reasoning_effort="none"` que o schema JSON estrito, `temperature` e `seed` são
+   aceitos.
+2. **`beers` com guia** (cerca de 40 chamadas). Medir; examinar o destino das 31
+   marcas de `brewery-name` pela decomposição por fonte; se o limpador for bom,
+   congelar o invariante: o limpador, o `respostas.jsonl` e dois testes.
+3. **`environment` com guia e os dois braços sem guia** (cerca de 120 chamadas).
+
+Depois vem a **medição nas linhas nunca vistas** (700 de `beers` e 2.110 de
+`environment`). Ela fica **fora do plano da parte 2**: exige preparar as fatias a
+partir do arquivo completo, renomeando `beer_name`/`brewery_name` para a grafia com
+hífen, e isso lê o CSV limpo, então tem de morar fora de `limpeza2/`.
 
 ## 8. Como o usuário trabalha
 

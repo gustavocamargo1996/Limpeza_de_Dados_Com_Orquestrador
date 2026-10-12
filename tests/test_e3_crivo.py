@@ -2,7 +2,7 @@
 import pandas as pd
 import pytest
 
-from limpeza2.e3_crivo import crivar_deteccao, crivar_reparo
+from limpeza2.e3_crivo import _reprovar_reparo, crivar_deteccao, crivar_reparo
 from limpeza2.tipos import Candidata, Entrada, Perfil, Reparo
 
 
@@ -119,6 +119,15 @@ def test_entre_variantes_fica_a_que_marca_menos(sujo):
     assert larga.metricas["motivo"] == "aprovada"
     assert larga.metricas["marcadas"] == 2
     assert estreita.metricas["marcadas"] == 1
+    assert crivar_deteccao([estreita, larga], entrada) == [estreita]
+
+
+def test_reprova_taxa_acima_do_teto_sem_ser_a_coluna_inteira(sujo):
+    entrada = monta_entrada(sujo)
+    c = candidata("dominio", {"valores": ["MA"]})
+    assert crivar_deteccao([c], entrada) == []
+    assert c.metricas["marcadas"] == 5
+    assert c.metricas["motivo"] == "marca_demais"
 
 
 @pytest.mark.parametrize(
@@ -126,17 +135,21 @@ def test_entre_variantes_fica_a_que_marca_menos(sujo):
 )
 def test_reprova_dependencia_sem_perfil(sujo, determinantes):
     entrada = monta_entrada(sujo)
+    # Entrada de baixa ambiguidade para ["cidade"]: o composto so e reprovado
+    # pela ramificacao de tamanho, nunca por falta de entrada.
+    entrada.perfil.pares[("cidade", "estado")] = {
+        "det": 0.9, "n_grupos": 2, "n_divergentes": 2, "frac_ambiguos": 0.0
+    }
     c = candidata("dependencia", {"determinantes": determinantes}, coluna="estado")
+    if determinantes == ["cidade"]:
+        entrada.perfil.pares.clear()
     assert crivar_deteccao([c], entrada) == []
     assert c.metricas["motivo"] == "sem_perfil"
 
 
 def test_crivar_reparo_guarda_contra_reparo_fora_da_mascara(sujo):
-    # Guarda de regressao, nao caminho normal: nenhuma das cinco estrategias
-    # toca linha fora da mascara, e este teste e o que acusa se alguma passar
-    # a tocar. Por isso chama a funcao interna direto.
-    from limpeza2.e3_crivo import _reprovar_reparo
-
+    # Guarda de regressao: nenhuma estrategia toca linha fora da mascara, e
+    # este teste acusa se alguma passar a tocar. Chama a funcao interna.
     entrada = monta_entrada(sujo, linhas_guia=(0, 1))
     novo = entrada.sujo.copy()
     novo.at[0, "estado"] = "ZZ"
@@ -172,3 +185,30 @@ def test_crivar_reparo_reprova_quem_nao_repara_nada(sujo):
     )
     assert crivar_reparo([r], entrada) == []
     assert r.candidata.metricas["motivo_reparo"] == "nao_repara"
+
+
+def test_crivar_reparo_reprova_quem_repara_o_par_para_o_valor_errado(sujo):
+    entrada = monta_entrada(sujo, pares=[(4, "estado", "XX", "MA")])
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    crivar_deteccao([c], entrada)
+    r = Reparo(
+        candidata=c, estrategia="dicionario", parametros={"mapa": {"XX": "TX"}},
+        raciocinio="x",
+    )
+    assert crivar_reparo([r], entrada) == []
+    assert c.metricas["reparadas"] == 1
+    assert c.metricas["motivo_reparo"] == "perde_par_do_guia"
+
+
+def test_crivar_reparo_reprova_estrategia_que_lanca(sujo):
+    entrada = monta_entrada(sujo)
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    crivar_deteccao([c], entrada)
+    r = Reparo(
+        candidata=c, estrategia="normalizar", parametros={"funcao": "explode"},
+        raciocinio="x",
+    )
+    def explode(valor):
+        raise ValueError("falha de proposito")
+    assert crivar_reparo([r], entrada, {"explode": explode}) == []
+    assert c.metricas["motivo_reparo"] == "lancou"

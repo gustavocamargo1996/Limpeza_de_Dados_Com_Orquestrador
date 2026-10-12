@@ -83,11 +83,11 @@ def crivar_reparo(propostas, entrada, funcoes=None):
     aprovados = []
     for proposta in propostas:
         candidata = proposta.candidata
-        mascara = detectar(
-            entrada.sujo, candidata.coluna, candidata.tipo, candidata.parametros,
-            config.DOMINANCIA_MODA,
-        ).fillna(False)
         try:
+            mascara = detectar(
+                entrada.sujo, candidata.coluna, candidata.tipo, candidata.parametros,
+                config.DOMINANCIA_MODA,
+            ).fillna(False)
             novo, reparada = reparar(
                 entrada.sujo, candidata.coluna, proposta.estrategia,
                 proposta.parametros, mascara, funcoes, config.DOMINANCIA_MODA,

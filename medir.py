@@ -57,6 +57,8 @@ def avaliar(caminho_limpador, caminho_sujo, caminho_limpo, holdout=None):
         else:
             corrigido, flags = modulo.aplicar(sujo)
             fontes = None
+        truncada = bool(getattr(modulo, "GERACAO_TRUNCADA", False))
+        degradadas = int(getattr(modulo, "UNIDADES_DEGRADADAS_POR_TETO", 0))
 
     manter_fora = sujo.index.intersection(pd.Index(sorted(holdout or [])))
     manter = sujo.index.difference(manter_fora)
@@ -91,6 +93,8 @@ def avaliar(caminho_limpador, caminho_sujo, caminho_limpo, holdout=None):
         "colunas": colunas,
         "holdout": len(manter_fora),
         "fontes": por_fonte,
+        "truncada": truncada,
+        "degradadas": degradadas,
         "total": {"erros": n_erro, "mudancas": n_mud, "tp": tp, "flags": n_flag,
                   "precisao": p, "recall": r, "f1": f1},
     }
@@ -117,6 +121,9 @@ def main():
 
     print(f"limpador: {Path(args.limpador).name}")
     print(f"holdout:  {r['holdout']} linhas fora da metrica\n")
+    if r["truncada"]:
+        print(f"AVISO: geracao TRUNCADA pelo teto de chamadas ({r['degradadas']} unidade(s) sem regra); "
+              "estes numeros nao sao de uma geracao completa\n")
     print(f"{'coluna':22s}| {'erros':>6s} | {'mudou':>6s} | {'TP':>5s} | "
           f"{'precisao':>8s} | {'recall':>6s} | {'F1':>6s} | flags")
     print("-" * 88)

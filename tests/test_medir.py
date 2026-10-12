@@ -1,11 +1,12 @@
 """A metrica, ancorada no placar da POC 1 que o HANDOFF registra."""
 import numbers
+import sys
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
-from medir import avaliar, f1_reparo, linhas_do_guia
+from medir import avaliar, f1_reparo, linhas_do_guia, main
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -167,3 +168,24 @@ def test_linhas_do_guia_pares_so_com_cabecalho(tmp_path):
 
 def test_linhas_do_guia_arquivos_ausentes(tmp_path):
     assert linhas_do_guia(tmp_path / "l.csv", tmp_path / "p.csv") == set()
+
+
+def test_limpador_truncado_e_avisado(tmp_path, monkeypatch, capsys):
+    sujo = tmp_path / "sujo.csv"
+    sujo.write_text("a\nx\n", encoding="utf-8")
+    limpador = tmp_path / "limpador_truncado.py"
+    limpador.write_text(
+        "GERACAO_TRUNCADA = True\nUNIDADES_DEGRADADAS_POR_TETO = 3\n"
+        "def aplicar(df):\n    return df.copy(), df != df\n", encoding="utf-8")
+    r = avaliar(limpador, sujo, sujo)
+    assert (r["truncada"], r["degradadas"]) == (True, 3)
+    monkeypatch.setattr(sys, "argv", ["medir", "--limpador", str(limpador),
+                                      "--sujo", str(sujo), "--limpo", str(sujo)])
+    main()
+    assert "AVISO: geracao TRUNCADA" in capsys.readouterr().out
+
+
+def test_limpador_da_poc_1_nao_e_truncado():
+    r = avaliar(FIXTURES / "limpador_beers_congelado.py",
+                FIXTURES / "beers_dirty_300.csv", FIXTURES / "beers_clean_300.csv")
+    assert r["truncada"] is False

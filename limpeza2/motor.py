@@ -1,6 +1,7 @@
 """Unica implementacao de aplicacao de regra; o limpador gerado embute este texto."""
 import pandas as pd
 
+NIVEL_SCHEMA = 3
 TIPOS = (
     "formato", "dominio", "faixa", "ausente_disfarcado", "dependencia", "conformidade"
 )
@@ -31,7 +32,7 @@ def detectar(df, coluna, tipo, parametros, dominancia=0.70):
         return divergentes_da_moda(df, parametros["determinantes"], coluna, dominancia)
     serie = df[coluna].astype(str)
     if tipo == "conformidade":
-        return ~serie.map(lambda v: padrao(v, 2)).isin(parametros["padroes"])
+        return ~serie.map(lambda v: padrao(v, NIVEL_SCHEMA)).isin(parametros["padroes"])
     if tipo == "formato":
         return ~serie.str.fullmatch(parametros["regex"], na=False)
     if tipo == "dominio":

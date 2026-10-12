@@ -64,7 +64,7 @@ caractere e padrão **antes** da dependência funcional, e reporta F1 de 0,99 em
 tipo de coluna, onde todos os baselines dão zero.
 
 **A medição que fecha o caso.** Derivei o schema de cada coluna **só das 20
-células certificadas do guia**, com o `padrao(v, 2)` que já existe em
+células certificadas do guia**, com o `padrao(v, 2)` (nível 2; hoje o nível é 3) que já existe em
 `e1_perfil`, e marquei o que não conforma — sem LLM e sem teto:
 
 | Coluna | padrões no guia | precisão | recall |
@@ -92,6 +92,26 @@ duas letras válidas. São exatamente as colunas que precisam de dependência
 funcional, e a abstenção é o sinal de roteamento: schema apertado com zero
 violação significa que, se há erro, ele é contextual.
 
+### Correção posterior: o nível do padrão é 3, não 2
+
+A tabela acima é do nível 2, que codifica a quantidade de dígitos: `index` (0 a
+299) tem os padrões `9`, `92`, `929`, e 20 linhas amostram algumas larguras, não
+todas. O schema ficava sensível a um acidente da amostra. O nível 3 descarta a
+contagem, e o argumento independe do gabarito. Implementado em
+`motor.NIVEL_SCHEMA = 3`; o corte continua um terço. Medido depois, com o
+gabarito, no nível 3: **678 de 829 erros** alcançados, precisão agregada 0,943
+(nível 2: 634 e 0,924). Por coluna: `ounces`, `state`, `ibu`, `Temperature`,
+`Measurement_Date`, `Monitoring_Station_ID` com 1,000 e 1,000; `abv` 0,972 e
+1,000; `city` 0,562 e 1,000 (9 de 9 erros, 16 marcadas); `Project_Name` 0,972 e
+0,625, mas o crivo a reprova por `perde_par_do_guia`. `index`, `id`, `brewery_id`,
+`PM2.5` e o `index` do `environment` deixam de ser marcadas.
+
+**O custo:** `brewery-name` passa a ter schema com 6 padrões e marca 31 células
+com precisão 0,000, e o crivo a aprova. **Opção não aplicada:** corte de um quarto
+excluiria `brewery-name` e daria precisão 0,985 com recall de 678 de 829. Não há
+argumento independente do gabarito para preferir um quarto, e aplicar seria ajustar
+limiar olhando a resposta; fica como decisão do usuário.
+
 ### O desenho aprovado pelo usuário, implementado
 
 Implementado em `limpeza2/conformidade.py` (`schema_da_coluna`,
@@ -99,9 +119,7 @@ Implementado em `limpeza2/conformidade.py` (`schema_da_coluna`,
 movida para lá) e na exceção do teto em `e3_crivo.py`. Âncora:
 `docs/DECISOES.md#conformidade-de-schema`. A espinha ainda não existe: a parte 2
 chama `candidatas_de_conformidade` antes do crivo. Reproduziu todos os números
-da tabela acima. Atenção: coluna sem erro e de largura variável (`index`, `id`,
-`brewery_id`, `PM2.5`) tem schema e é marcada com precisão 0,000 (9 a 15
-células), e o crivo a aprova.
+da tabela acima. O problema das colunas sem erro e de largura variável foi resolvido pelo nível 3 (ver acima).
 
 Uma etapa **determinística antes do detector**, no espírito do CatDB:
 
@@ -198,7 +216,7 @@ aparece.
    Anunciar antes.
 4. A espinha deve chamar `candidatas_de_conformidade` e entregar as candidatas ao
    crivo junto com as do detector; o detector só é chamado para as colunas sem
-   schema. Decidir o que fazer com coluna de schema sem erro (precisão 0,000).
+   schema. Decidir o que fazer com coluna de schema sem erro (`brewery-name`, 31 marcadas, precisão 0,000) e o corte de um quarto.
 
 ## 8. Como o usuário trabalha
 

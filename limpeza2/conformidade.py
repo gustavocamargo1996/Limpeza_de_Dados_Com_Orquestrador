@@ -1,15 +1,15 @@
 """Deriva o schema de cada coluna das celulas que o guia certificou; ver docs/DECISOES.md#conformidade-de-schema."""
 from limpeza2 import config
-from limpeza2.motor import padrao
+from limpeza2.motor import NIVEL_SCHEMA, padrao
 from limpeza2.tipos import Candidata
 
 
 def schema_da_coluna(entrada, coluna):
-    """Os padroes de nivel 2 das celulas do guia na coluna, ou None quando ela nao tem schema."""
+    """Os padroes de nivel 3 das celulas do guia na coluna, ou None quando ela nao tem schema."""
     guia = entrada.guia_linhas
     if coluna not in guia.columns or len(guia) == 0:
         return None
-    padroes = {padrao(str(v), 2) for v in guia[coluna]}
+    padroes = {padrao(str(v), NIVEL_SCHEMA) for v in guia[coluna]}
     if len(padroes) > config.FRACAO_PADROES_SCHEMA * len(guia):
         return None
     return padroes

@@ -455,25 +455,42 @@ determinística de um catálogo por coluna. O **Cocoon** põe caractere e padrã
 antes da dependência funcional e reporta F1 de 0,99 em tipo de coluna.
 
 **Decisão.** `conformidade.py` deriva, das células que o guia certificou, o
-conjunto de `padrao(v, 2)` de cada coluna e emite uma `Candidata` de tipo
+conjunto de `padrao(v, 3)` de cada coluna e emite uma `Candidata` de tipo
 `conformidade`. `motor.detectar` marca a célula cujo padrão não está no conjunto.
 Não há LLM, e a etapa só detecta: a correção fica com o especificador. `padrao`
 mora em `motor.py`, e não em `e1_perfil.py`, porque o limpador gerado leva só o
-texto do motor e o tipo precisa dela em tempo de execução.
+texto do motor e o tipo precisa dela em tempo de execução. O nível vem de
+`motor.NIVEL_SCHEMA`, uma só constante para derivar e para aplicar.
+
+**Por que o nível 3 e não o 2.** O nível 2 codifica a quantidade de caracteres:
+`index`, que vai de `0` a `299`, tem os padrões `9`, `92` e `929`, e 20 linhas
+amostram algumas larguras, não todas. O schema ficava sensível a um acidente da
+amostra, não a uma propriedade da coluna, e a coluna limpa era marcada com
+precisão 0,000. O nível 3 descarta a contagem (`0`, `12` e `299` viram `9`), e o
+argumento independe do gabarito. *Confirmação posterior, com o gabarito:* nível 2
+alcança 634 de 829 erros com precisão 0,924; nível 3, 678 de 829 com 0,943.
+`ibu` sobe a precisão de 0,957 para 1,000, `city` passa a ser alcançada inteira
+(9 de 9) e `index`, `id`, `brewery_id` e `PM2.5` deixam de ser marcadas.
 
 **O corte de um terço.** A coluna tem schema se os padrões distintos forem no
 máximo um terço das linhas do guia (6 em 20). É limiar a priori, declarado em
-`config.FRACAO_PADROES_SCHEMA`. Nos dados, separa 6 padrões
-(`Monitoring_Station_ID`, precisão 1,000) de 9 (`city`, que daria 0,123); em
-texto livre o método produz lixo (`beer-name`, precisão 0,000), e o próprio guia
-avisa para não usá-lo.
+`config.FRACAO_PADROES_SCHEMA`.
 
-**Medição (guia canônico, com o gabarito só para medir).** Precisão e recall:
-`ounces` 1,000 e 1,000; `state` 1,000 e 1,000; `abv` 0,972 e 1,000; `ibu` 0,957
-e 1,000; `Temperature`, `Measurement_Date` e `Monitoring_Station_ID` 1,000 e
-1,000. São 634 dos 829 erros dos dois datasets. `State` e `Climate_Zone` têm
-schema apertado e marcam zero, porque os erros são siglas válidas: a abstenção é
-o sinal de roteamento para a dependência funcional.
+**Medição no nível 3 (guia canônico, gabarito só para medir).** Precisão e
+recall: `ounces` 1,000 e 1,000; `state` 1,000 e 1,000; `abv` 0,972 e 1,000; `ibu`
+1,000 e 1,000; `Temperature`, `Measurement_Date` e `Monitoring_Station_ID` 1,000
+e 1,000; `city` 0,562 e 1,000 (16 marcadas, 9 erradas). `State` e `Climate_Zone`
+têm schema apertado e marcam zero, porque os erros são siglas válidas: a
+abstenção é o sinal de roteamento para a dependência funcional. `Project_Name`
+ganha schema de 3 padrões e marca 36 células, 35 erradas (precisão 0,972, recall
+0,625), mas o crivo a reprova por `perde_par_do_guia`.
+
+**O custo, e uma opção não aplicada.** `brewery-name` passa a ter schema com 6
+padrões e marca 31 células, todas certas (precisão 0,000), e o crivo a aprova.
+Apertar o corte para um quarto (5 em 20) excluiria `brewery-name` e levaria a
+precisão a 0,985 com recall de 678 de 829. **Não foi aplicado:** não há argumento
+independente do gabarito para escolher um quarto e não um terço, e aplicá-lo seria
+ajustar o limiar olhando a resposta. Fica como decisão do usuário.
 
 **Por que o teto não se aplica.** A restrição vem de dado que o humano
 certificou, não de chute do LLM, então limitar por taxa não faz sentido: se a
@@ -483,7 +500,3 @@ par. `marca_celula_correta` e o veto por valor certificado não disparam por
 construção, já que célula certificada conforma ao schema derivado dela mesma; o
 crivo os mantém ativos para `conformidade` como alarme de que o schema não está
 saindo das células certificadas.
-
-**O limite.** Coluna sem erro mas com largura variável (`index`, `id`, `PM2.5`)
-tem schema e é marcada com precisão 0,000; a regra passa no crivo, que não tem
-como saber, e cabe ao reparo não encontrar o que corrigir.

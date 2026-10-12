@@ -518,7 +518,7 @@ def guia_de_conformidade(n_fora, n=100, n_guia=20):
 
 
 def regra_de_conformidade():
-    return candidata("conformidade", {"padroes": ["92"]}, coluna="v")
+    return candidata("conformidade", {"padroes": ["9"]}, coluna="v")
 
 
 def test_conformidade_aprovada_acima_do_teto_da_coluna():
@@ -546,5 +546,5 @@ def test_conformidade_vacua_e_reprovada():
 def test_conformidade_nunca_marca_celula_nem_valor_certificado():
     entrada = guia_de_conformidade(n_fora=60)
     c = candidatas_de_conformidade(entrada)[0]
-    assert c.parametros == {"padroes": ["92"]}
+    assert c.parametros == {"padroes": ["9"]}
     assert crivar_deteccao([c], entrada) == [c]

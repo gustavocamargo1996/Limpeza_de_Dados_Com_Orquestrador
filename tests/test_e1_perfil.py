@@ -125,3 +125,9 @@ def test_perfilar_par_mede_cobertura():
 
 def test_perfilar_coluna_sem_linhas_tem_comprimento_zero():
     assert perfilar_coluna(pd.Series([], dtype=str))["comprimentos"] == (0, 0)
+
+
+def test_contagens_do_perfil_sao_int_do_python():
+    perfil = perfilar_coluna(pd.Series(["a", "a", "b"]))
+    for chave in ("frequentes", "raros", "padroes"):
+        assert all(type(n) is int for _, n in perfil[chave])

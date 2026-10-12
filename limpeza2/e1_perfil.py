@@ -87,8 +87,9 @@ def perfilar(caminho_sujo, caminho_guia):
                 pares[(determinante, determinado)] = p
                 quantos_determina[determinante] += 1
 
+    qualificadas = [c for c in sujo.columns if quantos_determina[c] > 0]
     candidatas = sorted(
-        sujo.columns, key=lambda c: (-quantos_determina[c], -colunas[c]["n_distintos"])
+        qualificadas, key=lambda c: (-quantos_determina[c], -colunas[c]["n_distintos"])
     )[:3]
     return Entrada(
         sujo=sujo,

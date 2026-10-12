@@ -1,4 +1,4 @@
-"""O perfil deterministico: padroes, estatisticas por coluna e os quatro numeros do par."""
+"""O perfil deterministico: padroes, estatisticas por coluna e os cinco numeros do par."""
 import pandas as pd
 import pytest
 
@@ -82,22 +82,37 @@ def test_perfilar_carrega_o_guia_quando_existe(tmp_path):
     entrada = perfilar(sujo, guia)
     assert list(entrada.guia_linhas.index) == [0]
     assert entrada.guia_pares.iloc[0]["limpo"] == "Y"
+    assert entrada.guia_pares["linha"].dtype.kind == "i"
+    assert entrada.guia_linhas.index.dtype.kind == "i"
 
 
-def test_candidatas_sujeito_elegem_a_coluna_que_determina_mais():
-    df = pd.DataFrame(
+def _perfil_de(tmp_path, colunas):
+    sujo = tmp_path / "sujo.csv"
+    pd.DataFrame(colunas).to_csv(sujo, index=False)
+    return perfilar(sujo, None).perfil
+
+
+def test_candidatas_so_incluem_colunas_que_determinam_algo(tmp_path):
+    n = 24
+    perfil = _perfil_de(
+        tmp_path,
         {
-            "id": [f"e{i}" for i in range(12)] * 2,
-            "nome": [f"n{i}" for i in range(12)] * 2,
-            "tipo": ["t"] * 24,
-        }
+            "id": [f"e{i}" for i in range(n)],
+            "cidade": [f"c{i % 6}" for i in range(n)],
+            "estado": [f"s{(i % 6) // 2}" for i in range(n)],
+            "tipo": ["t"] * n,
+        },
     )
-    pares = {}
-    for a in df.columns:
-        for b in df.columns:
-            if a != b:
-                pares[(a, b)] = perfilar_par(df, a, b, 0.70)
-    assert pares[("id", "nome")]["det"] == pytest.approx(1.0)
+    assert perfil.candidatas_sujeito == ["cidade", "estado"]
+
+
+def test_candidatas_desempatam_por_mais_distintos(tmp_path):
+    n = 24
+    perfil = _perfil_de(
+        tmp_path,
+        {"a": [f"a{i % 6}" for i in range(n)], "b": [f"b{i % 4}" for i in range(n)], "c": ["k"] * n},
+    )
+    assert perfil.candidatas_sujeito == ["a", "b"]
 
 
 def test_perfilar_par_mede_cobertura():

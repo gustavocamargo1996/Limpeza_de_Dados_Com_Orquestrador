@@ -427,3 +427,54 @@ públicas que não podem sair da rede. Um typo que caísse silenciosamente para
 OpenAI mandaria a tabela do usuário para fora.
 
 **Provedor desta POC.** OpenAI, modelo `gpt-5.6-luna`, nome e chave no `.env`.
+
+---
+
+## Conformidade de schema {#conformidade-de-schema}
+
+**Problema.** Um único juiz, o teto estatístico de marcação, servia a todo tipo
+de erro. Para coluna de tipo claro (numérico com uma decimal, inteiro, data) a
+pergunta é lógica, não estatística: "este valor obedece ao formato da coluna?".
+Rotear esse caso fácil por um juiz desenhado para o difícil custou meia sessão
+tentando tirar um `℃` de uma coluna numérica.
+
+**O que o mapeamento prescreve.** Os três estudos concordam: inferir o tipo da
+coluna primeiro e derivar a restrição dele. O **BClean+** usa o LLM só para
+rotular o tipo semântico e sintetiza a regex; a ablação sem isso derruba o F1 em
+0,36 e o leva a zero no `flights`. O **CatDB** deriva as regras de forma
+determinística de um catálogo por coluna. O **Cocoon** põe caractere e padrão
+antes da dependência funcional e reporta F1 de 0,99 em tipo de coluna.
+
+**Decisão.** `conformidade.py` deriva, das células que o guia certificou, o
+conjunto de `padrao(v, 2)` de cada coluna e emite uma `Candidata` de tipo
+`conformidade`. `motor.detectar` marca a célula cujo padrão não está no conjunto.
+Não há LLM, e a etapa só detecta: a correção fica com o especificador. `padrao`
+mora em `motor.py`, e não em `e1_perfil.py`, porque o limpador gerado leva só o
+texto do motor e o tipo precisa dela em tempo de execução.
+
+**O corte de um terço.** A coluna tem schema se os padrões distintos forem no
+máximo um terço das linhas do guia (6 em 20). É limiar a priori, declarado em
+`config.FRACAO_PADROES_SCHEMA`. Nos dados, separa 6 padrões
+(`Monitoring_Station_ID`, precisão 1,000) de 9 (`city`, que daria 0,123); em
+texto livre o método produz lixo (`beer-name`, precisão 0,000), e o próprio guia
+avisa para não usá-lo.
+
+**Medição (guia canônico, com o gabarito só para medir).** Precisão e recall:
+`ounces` 1,000 e 1,000; `state` 1,000 e 1,000; `abv` 0,972 e 1,000; `ibu` 0,957
+e 1,000; `Temperature`, `Measurement_Date` e `Monitoring_Station_ID` 1,000 e
+1,000. São 634 dos 829 erros dos dois datasets. `State` e `Climate_Zone` têm
+schema apertado e marcam zero, porque os erros são siglas válidas: a abstenção é
+o sinal de roteamento para a dependência funcional.
+
+**Por que o teto não se aplica.** A restrição vem de dado que o humano
+certificou, não de chute do LLM, então limitar por taxa não faz sentido: se a
+coluna está 98% fora do schema, 98% é a verdade (em `ounces` o teto chega a
+1,224 e seria vácuo de todo jeito). Continuam valendo a não-vacuidade e o piso do
+par. `marca_celula_correta` e o veto por valor certificado não disparam por
+construção, já que célula certificada conforma ao schema derivado dela mesma; o
+crivo os mantém ativos para `conformidade` como alarme de que o schema não está
+saindo das células certificadas.
+
+**O limite.** Coluna sem erro mas com largura variável (`index`, `id`, `PM2.5`)
+tem schema e é marcada com precisão 0,000; a regra passa no crivo, que não tem
+como saber, e cabe ao reparo não encontrar o que corrigir.

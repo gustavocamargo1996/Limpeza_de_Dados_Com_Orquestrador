@@ -12,7 +12,7 @@ MOTIVOS = (
     "ambigua", "sem_perfil", "lancou", "nao_repara", "corrompe_celula_do_guia",
     "marca_valor_certificado", "uniao_acima_do_teto",
 )
-TIPOS_DE_VALOR = ("formato", "dominio", "faixa", "ausente_disfarcado")
+TIPOS_DE_VALOR = ("formato", "dominio", "faixa", "ausente_disfarcado", "conformidade")
 
 
 def crivar_deteccao(candidatas, entrada):
@@ -91,7 +91,8 @@ def _reprovar(candidata, entrada, mascara):
         return "marca_valor_certificado"
     if candidata.metricas["marcadas"] == 0:
         return "vacua"
-    if candidata.metricas["taxa"] > candidata.metricas["teto"]:
+    # Conformidade vem de dado certificado: a taxa alta e a verdade da coluna, sem teto.
+    if candidata.tipo != "conformidade" and candidata.metricas["taxa"] > candidata.metricas["teto"]:
         return "marca_demais"
     pares = entrada.guia_pares
     if not pares.empty:

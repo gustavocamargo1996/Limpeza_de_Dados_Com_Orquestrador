@@ -256,7 +256,8 @@ limpeza2/
   config.py             # modelo, caminhos, limiares, semente
   provedor.py           # entrega o cliente do provedor de LLM escolhido
   portao.py             # valida o Python gerado antes de deixa-lo rodar
-  motor.py              # UNICA implementacao de aplicacao de regra
+  motor.py              # UNICA implementacao de aplicacao de regra (inclui `padrao`)
+  conformidade.py       # deriva o schema de cada coluna das celulas que o guia certificou
   limites.py            # calcula os limites que o guia sustenta para uma coluna
   e1_perfil.py          # etapa 1: perfila a tabela suja, lida como texto literal
   e2_detector.py        # etapa 2: agente detector -> predicados candidatos

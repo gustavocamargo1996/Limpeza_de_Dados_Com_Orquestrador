@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from limpeza2 import config
+from limpeza2.conformidade import candidatas_de_conformidade
 from limpeza2.e3_crivo import (
     _marca_valor_certificado, _reprovar_reparo, crivar_deteccao, crivar_reparo,
 )
@@ -500,3 +501,42 @@ def test_empate_de_taxa_nao_depende_da_ordem_da_lista():
     assert crivar_deteccao([marca_x, marca_y], entrada) == [marca_y]
     marca_x, marca_y = par_de_tipos()
     assert crivar_deteccao([marca_y, marca_x], entrada) == [marca_y]
+
+
+def guia_de_conformidade(n_fora, n=100, n_guia=20):
+    """Coluna `v` de dois digitos com n_fora celulas `X`; o guia e feito de linhas conformes."""
+    valores = ["X"] * n_fora + ["12"] * (n - n_fora)
+    return monta_entrada(pd.DataFrame({"v": valores}), linhas_guia=range(n_fora, n_fora + n_guia))
+
+
+def regra_de_conformidade():
+    return candidata("conformidade", {"padroes": ["92"]}, coluna="v")
+
+
+def test_conformidade_aprovada_acima_do_teto_da_coluna():
+    entrada = guia_de_conformidade(n_fora=60)
+    c = regra_de_conformidade()
+    assert c.metricas == {}
+    assert crivar_deteccao([c], entrada) == [c]
+    assert c.metricas["taxa"] == 0.6 > c.metricas["teto"]
+
+
+def test_teto_continua_valendo_para_os_outros_tipos():
+    entrada = guia_de_conformidade(n_fora=60)
+    c = candidata("formato", {"regex": "12"}, coluna="v")
+    assert crivar_deteccao([c], entrada) == []
+    assert c.metricas["motivo"] == "marca_demais"
+
+
+def test_conformidade_vacua_e_reprovada():
+    entrada = guia_de_conformidade(n_fora=0)
+    c = regra_de_conformidade()
+    assert crivar_deteccao([c], entrada) == []
+    assert c.metricas["motivo"] == "vacua"
+
+
+def test_conformidade_nunca_marca_celula_nem_valor_certificado():
+    entrada = guia_de_conformidade(n_fora=60)
+    c = candidatas_de_conformidade(entrada)[0]
+    assert c.parametros == {"padroes": ["92"]}
+    assert crivar_deteccao([c], entrada) == [c]

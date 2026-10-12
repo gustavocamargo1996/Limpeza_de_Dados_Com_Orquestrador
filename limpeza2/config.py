@@ -1,5 +1,6 @@
 """Caminhos, limiares, semente e modelo: a unica configuracao ajustavel."""
 import os
+from fractions import Fraction
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -26,6 +27,8 @@ DET_MINIMO = 0.70
 COBERTURA_MINIMA = 0.50
 GRUPOS_MINIMOS_PAR = 2
 VARIANTES_POR_TIPO = 3
+# Coluna tem schema se os padroes distintos do guia forem no maximo esta fracao das linhas.
+FRACAO_PADROES_SCHEMA = Fraction(1, 3)
 
 PROVEDOR = os.getenv("PROVEDOR", "openai")
 MODELO = os.getenv("MODELO", "gpt-5.6-luna")

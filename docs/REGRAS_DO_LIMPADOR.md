@@ -101,7 +101,7 @@ para medir quanto o guia compra, e cada pasta traz um `guia_receita.txt`.
 ## 4. Os cinco tipos de erro que o limpador reconhece
 
 O catálogo é **fechado**: o detector escolhe entre estes cinco e não inventa um
-sexto. A ordem é de abrangência crescente — primeiro o que se vê no caractere,
+sexto. (O sexto tipo, `conformidade`, existe, mas não é proposto por ele: ver 4.6.) A ordem é de abrangência crescente — primeiro o que se vê no caractere,
 depois o que se vê no padrão, depois a ausência, e por último o que só se vê
 olhando outras colunas da mesma linha.
 
@@ -259,6 +259,35 @@ em dias diferentes. Para um limpador cujo propósito é ser reexecutável e
 auditável, isso é defeito grave, e passou perto de acontecer.
 
 ---
+
+### 4.6 `conformidade`, o sexto tipo, que não vem do LLM
+
+Para coluna de tipo claro (numérico com uma decimal, inteiro, data) a pergunta
+não é estatística, é lógica: "este valor obedece ao formato da coluna?". Por isso
+este tipo não é proposto pelo detector. Uma etapa determinística, antes dele,
+olha as células que o guia certificou como corretas e anota o **padrão** de cada
+uma (`92` para `12`, `94-92-92` para `2024-05-17`). Se os padrões distintos forem
+no máximo **um terço** das linhas do guia (6 em 20), a coluna **tem schema**, e a
+regra marca toda célula cujo padrão não é um dos vistos. O guia que diz ter 9
+padrões em 20 linhas (`city`) é texto livre, e a etapa se abstém.
+
+O crivo trata este tipo à parte: **não aplica o teto de marcação**, porque a
+restrição veio de dado que o humano certificou, e se a coluna está 98% fora do
+schema, 98% é a verdade. Continuam valendo a não-vacuidade e o piso do guia. Os
+outros dois testes (célula correta do guia e valor certificado) não podem
+disparar, por construção.
+
+O que o schema faz com cada coluna decide o roteamento:
+
+| O schema da coluna | O que acontece | Quem resolve |
+|---|---|---|
+| apertado, **com** violações | caso fácil: os erros estão marcados, sem LLM | `conformidade`; o especificador só diz como corrigir (tirar o sufixo, a decimal) |
+| apertado, **sem** violação | o erro, se existe, é contextual: `HH` e `BE` são siglas válidas | a dependência funcional (`State`, `Climate_Zone`) |
+| largo (texto livre) | o caso difícil, onde só a estatística e o LLM ajudam | detector com teto de marcação |
+
+Nos dois guias canônicos, a conformidade alcança 634 dos 829 erros (76%), com
+recall de 1,000 e precisão nunca abaixo de 0,957, sem LLM. Detalhes e medição em
+`docs/DECISOES.md#conformidade-de-schema`.
 
 ## 5. O crivo: por que a maioria das regras propostas é reprovada
 

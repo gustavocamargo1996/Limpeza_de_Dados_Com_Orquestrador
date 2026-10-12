@@ -170,9 +170,14 @@ a cidade.
 
 Há uma exceção, e ela recupera erros que a regra orientada perderia: se o valor
 da coluna determinante aparece **uma única vez** na tabela e existe outro valor
-de determinante a **uma letra de distância** com um grupo de verdade, então o
+de determinante a **uma edição de distância** com um grupo de verdade, então o
 erro está no determinante. É o caso do erro de digitação na chave — `Bosotn` em
 vez de `Boston`. Aí se corrige o determinante e se deixa o determinado em paz.
+
+Uma edição é a troca, a inserção ou a remoção de um caractere, **ou a troca de
+lugar entre dois caracteres vizinhos**. Essa última é a mais comum de todas, e
+contá-la como uma edição só é o que faz `Bosotn` ser reconhecido como `Boston` —
+pela conta tradicional ele estaria a duas edições e passaria batido.
 
 ---
 

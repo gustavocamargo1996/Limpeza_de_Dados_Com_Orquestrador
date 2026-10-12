@@ -255,6 +255,11 @@ a distância de edição 1 com grupo de suporte ≥ 2, o erro está no determina
 é ele que é corrigido. Recupera erro de digitação na chave, que a dependência
 orientada perderia.
 
+A distância é **Damerau-Levenshtein restrita**, em que a transposição de
+caracteres adjacentes custa uma edição. Em Levenshtein puro, `Bosotn` → `Boston`
+custa 2, e a transposição — provavelmente a classe mais comum de erro de
+digitação — ficaria fora do método. São quatro linhas a mais no cálculo.
+
 Depois, `crivar_reparo` reprova a estratégia que altere célula das linhas limpas
 do guia, que não reproduza os pares daquela coluna, ou que repare zero células
 detectadas.

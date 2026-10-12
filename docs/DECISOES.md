@@ -181,7 +181,14 @@ acaso em vez de por entidade.
 
 **Decisão.** Por padrão, repara-se o lado determinado. Exceção: se o valor do
 determinante ocorre uma única vez na coluna e existe outro valor de determinante
-a distância de edição 1 com grupo de suporte ≥ 2, corrige-se o determinante.
+a distância de edição 1 com grupo de suporte ≥ 2, corrige-se o determinante. A
+distância é **Damerau-Levenshtein restrita**.
+
+**Por que Damerau e não Levenshtein.** Descoberto na auto-revisão do plano: em
+Levenshtein puro a transposição `Bosotn` → `Boston` custa 2, e como a exceção
+exige distância exatamente 1, a classe mais comum de erro de digitação ficaria
+fora do método. Contar transposição de adjacentes como uma edição custa quatro
+linhas.
 
 **Por quê.** A dependência orientada perde erro de digitação na chave. O BClean+
 resolve isso reinferindo cada célula a partir da linha inteira, por máximo a

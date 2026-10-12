@@ -1,6 +1,21 @@
 _linha,index,id,beer-name,style,ounces,abv,ibu,brewery_id,brewery-name,city,state
-2,3,2264,Rise of the Phoenix,American IPA,12,0.071,,177,18th Street Brewery,Gary,IN
-3,4,2263,Sinister,American Double / Imperial IPA,12,0.09,,177,18th Street Brewery,Gary,IN
-4,5,2262,Sex and Candy,American IPA,12,0.075,,177,18th Street Brewery,Gary,IN
-5,6,2261,Black Exodus,Oatmeal Stout,12,0.077,,177,18th Street Brewery,Gary,IN
-6,7,2260,Lake Street Express,American Pale Ale (APA),12,0.045,,177,18th Street Brewery,Gary,IN
+37,38,10,Brew Free! or Die IPA,American IPA,12,0.07,65,368,21st Amendment Brewery,San Francisco,CA
+60,61,47,Ballz Deep Double IPA,American Double / Imperial IPA,16,0.084,82,481,7 Seas Brewing Company,Gig Harbor,WA
+97,98,2578,IPA,American IPA,12,0.065,,35,Anchor Brewing Company,San Francisco,CA
+111,112,811,Boont Amber Ale (2010),American Amber / Red Ale,12,0.058,15,171,Anderson Valley Brewing Company,Boonville,CA
+114,115,523,Winter Solstice,Winter Warmer,12,0.069,6,171,Anderson Valley Brewing Company,Boonville,CA
+122,123,1294,Angry Orchard Apple Ginger,Cider,16,0.05,,434,Angry Orchard Cider Company,Cincinnati,OH
+137,138,1322,Green Bullet Organic India Pale Ale,American IPA,16,0.07,45,429,Asher Brewing Company,Boulder,CO
+148,149,979,Poop Deck Porter,American Porter,12,0.062,35,374,Astoria Brewing Company,Astoria,OR
+181,182,965,Field 41 Pale Ale,American Pale Ale (APA),12,0.044,38,483,Bale Breaker Brewing Company,Yakima,WA
+182,183,2593,Grapefruit Sculpin,American IPA,12,0.07,,34,Ballast Point Brewing Company,San Diego,CA
+208,209,707,Celsius Summer Ale (2012),American Pale Wheat Ale,12,0.047,,292,Baxter Brewing Company,Lewiston,ME
+219,220,2022,Winter White,Witbier,16,0.05,,76,Bell's Brewery,Kalamazoo,MI
+225,226,2556,Nordic Blonde,American Blonde Ale,12,0.057,27,53,Bent Brewstillery,Roseville,MN
+231,232,1253,Venture Pils,German Pilsener,12,0.05,38,75,Bent Paddle Brewing Company,Duluth,MN
+236,237,1156,Number 22 Porter,American Porter,12,0.064,,463,Big Bend Brewing Company,Alpine,TX
+241,242,1422,West Portal Colorado Common Summer Ale,California Common / Steam Beer,16,0.041,,220,Big Choice Brewing,Broomfield,CO
+245,246,1001,413 Farmhouse Ale,Saison / Farmhouse Ale,12,0.06,,477,Big Elm Brewing,Sheffield,MA
+254,255,1712,Montana Trout Slayer Ale,American Pale Wheat Ale,12,0.05,35,336,Big Sky Brewing Company,Missoula,MT
+255,256,1711,Moose Drool Brown Ale,American Brown Ale,12,0.051,26,336,Big Sky Brewing Company,Missoula,MT
+267,268,1256,Forest Fire Imperial Smoked Rye,Rye Beer,16,0.099,85,444,Big Wood Brewery,Vadnais Heights,MN

@@ -2,14 +2,22 @@
 import pandas as pd
 import pytest
 
-from limpeza2.e3_crivo import _reprovar_reparo, crivar_deteccao, crivar_reparo
+from limpeza2 import config
+from limpeza2.conformidade import candidatas_de_conformidade
+from limpeza2.e3_crivo import (
+    _marca_valor_certificado, _reprovar_reparo, crivar_deteccao, crivar_reparo,
+)
+from limpeza2.limites import teto_da_coluna
 from limpeza2.tipos import Candidata, Entrada, Perfil, Reparo
 
 
-def monta_entrada(sujo, linhas_guia=(), pares=()):
-    guia_linhas = sujo.loc[list(linhas_guia)] if linhas_guia else pd.DataFrame(
+def monta_entrada(sujo, linhas_guia=(), pares=(), corrigidos=None):
+    """O guia traz o valor do sujo, salvo nas celulas de `corrigidos` {(linha, coluna): valor}."""
+    guia_linhas = sujo.loc[list(linhas_guia)].copy() if linhas_guia else pd.DataFrame(
         columns=sujo.columns
     )
+    for (linha, coluna), valor in (corrigidos or {}).items():
+        guia_linhas.at[linha, coluna] = valor
     guia_pares = pd.DataFrame(
         list(pares), columns=["linha", "coluna", "sujo", "limpo"]
     ) if pares else pd.DataFrame(columns=["linha", "coluna", "sujo", "limpo"])
@@ -64,11 +72,28 @@ def test_reprova_regra_que_marca_a_coluna_inteira(sujo):
     assert c.metricas["motivo"] == "marca_demais"
 
 
-def test_reprova_regra_que_toca_linha_limpa_do_guia(sujo):
+def test_reprova_regra_que_marca_celula_correta_do_guia(sujo):
     entrada = monta_entrada(sujo, linhas_guia=(0, 1, 2))
     c = candidata("dominio", {"valores": ["TX"]})
     assert crivar_deteccao([c], entrada) == []
-    assert c.metricas["motivo"] == "toca_linha_limpa"
+    assert c.metricas["motivo"] == "marca_celula_correta"
+
+
+def test_aprova_regra_que_marca_so_celula_errada_do_guia(sujo):
+    # A linha 4 (XX) esta no guia corrigida para MA: marcar o XX e o certo.
+    entrada = monta_entrada(sujo, linhas_guia=(4,), corrigidos={(4, "estado"): "MA"})
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    assert crivar_deteccao([c], entrada) == [c]
+    assert c.metricas["marcadas"] == 2
+    assert c.metricas["motivo"] == "aprovada"
+
+
+def test_controle_negativo_so_olha_a_coluna_da_candidata(sujo):
+    # O guia nao tem a coluna `estado`: nada a comparar, e a regra segue para os outros testes.
+    entrada = monta_entrada(sujo, linhas_guia=(0, 4))
+    entrada.guia_linhas = entrada.guia_linhas[["cidade"]]
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    assert crivar_deteccao([c], entrada) == [c]
 
 
 def test_reprova_regra_que_perde_par_do_guia(sujo):
@@ -158,7 +183,7 @@ def test_crivar_reparo_guarda_contra_reparo_fora_da_mascara(sujo):
     c = candidata("dominio", {"valores": ["MA", "TX"]})
     r = Reparo(candidata=c, estrategia="dicionario", parametros={}, raciocinio="x")
     mascara = pd.Series(False, index=novo.index)
-    assert _reprovar_reparo(entrada, novo, reparada, r, mascara) == "toca_linha_limpa"
+    assert _reprovar_reparo(entrada, novo, reparada, r, mascara) == "corrompe_celula_do_guia"
 
 
 def test_crivar_reparo_aprova_quem_repara_e_respeita_o_guia(sujo):
@@ -272,3 +297,254 @@ def test_crivar_reparo_responde_por_determinante_que_escreveu_valor_errado():
     )
     assert crivar_reparo([r], entrada) == []
     assert c.metricas["motivo_reparo"] == "perde_par_do_guia"
+
+
+def _reparo_por_mapa(sujo, mapa, **guia):
+    entrada = monta_entrada(sujo, linhas_guia=(4,), **guia)
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    crivar_deteccao([c], entrada)
+    r = Reparo(candidata=c, estrategia="dicionario", parametros={"mapa": mapa}, raciocinio="x")
+    return entrada, c, r
+
+
+def test_crivar_reparo_reprova_quem_escreve_valor_errado_no_guia(sujo):
+    entrada, c, r = _reparo_por_mapa(
+        sujo, {"XX": "TX", "YY": "MA"}, corrigidos={(4, "estado"): "MA"}
+    )
+    assert crivar_reparo([r], entrada) == []
+    assert c.metricas["motivo_reparo"] == "corrompe_celula_do_guia"
+
+
+def test_crivar_reparo_aprova_quem_escreve_valor_certo_no_guia(sujo):
+    entrada, c, r = _reparo_por_mapa(
+        sujo, {"XX": "MA", "YY": "MA"}, corrigidos={(4, "estado"): "MA"}
+    )
+    assert crivar_reparo([r], entrada) == [r]
+    assert c.metricas["motivo_reparo"] == "aprovada"
+
+
+def test_crivar_reparo_reprova_quem_deixa_intacta_celula_suja_do_guia(sujo):
+    # A linha 4 (XX) esta na mascara e o guia a corrige para MA: continuar XX perde.
+    entrada, c, r = _reparo_por_mapa(
+        sujo, {"YY": "MA"}, corrigidos={(4, "estado"): "MA"}
+    )
+    assert crivar_reparo([r], entrada) == []
+    assert c.metricas["motivo_reparo"] == "perde_par_do_guia"
+
+
+def test_crivar_reparo_aprova_celula_suja_do_guia_fora_da_mascara(sujo):
+    # A mascara so pega a linha 9 (YY); a 4 (XX) fica fora e intacta.
+    entrada = monta_entrada(sujo, linhas_guia=(4,), corrigidos={(4, "estado"): "MA"})
+    c = candidata("dominio", {"valores": ["MA", "TX", "XX"]})
+    crivar_deteccao([c], entrada)
+    r = Reparo(candidata=c, estrategia="dicionario", parametros={"mapa": {"YY": "MA"}},
+               raciocinio="x")
+    assert crivar_reparo([r], entrada) == [r]
+    assert c.metricas["motivo_reparo"] == "aprovada"
+
+
+def test_crivar_reparo_reprova_quem_escreve_em_celula_certa_do_guia(sujo):
+    # A linha 0 esta certa (MA) no guia e o reparo a reescreve com outro valor.
+    entrada = monta_entrada(sujo, linhas_guia=(0,))
+    novo = entrada.sujo.copy()
+    novo.at[0, "estado"] = "TX"
+    reparada = pd.Series(False, index=novo.index)
+    reparada.loc[4] = True
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    r = Reparo(candidata=c, estrategia="dicionario", parametros={}, raciocinio="x")
+    mascara = pd.Series(False, index=novo.index)
+    assert _reprovar_reparo(entrada, novo, reparada, r, mascara) == "corrompe_celula_do_guia"
+
+
+def guia_de_taxa(sujas_no_guia, n_guia, sujas_fora, n=100):
+    """Coluna `v` com `ok` ou `X`: o guia tem as n_guia primeiras linhas, `sujas_no_guia` delas sujas."""
+    valores = ["ok"] * n
+    for i in list(range(sujas_no_guia)) + list(range(n_guia, n_guia + sujas_fora)):
+        valores[i] = "X"
+    sujo = pd.DataFrame({"v": valores})
+    corrigidos = {(i, "v"): "ok" for i in range(sujas_no_guia)}
+    return monta_entrada(sujo, linhas_guia=range(n_guia), corrigidos=corrigidos)
+
+
+def regra_ok():
+    return candidata("dominio", {"valores": ["ok"]}, coluna="v")
+
+
+def test_teto_sobe_quando_o_guia_esta_todo_sujo():
+    entrada = guia_de_taxa(20, 20, 78)
+    c = regra_ok()
+    assert crivar_deteccao([c], entrada) == [c]
+    assert c.metricas["taxa"] == 0.98
+    assert c.metricas["teto"] == pytest.approx(1.0 + 2 * (0.25 / 20) ** 0.5)
+
+
+def test_guia_quase_limpo_mantem_o_teto_e_reprova_quem_marca_demais():
+    entrada = guia_de_taxa(0, 20, 80)
+    c = regra_ok()
+    assert crivar_deteccao([c], entrada) == []
+    assert c.metricas["teto"] == config.TETO_MARCACAO
+    assert c.metricas["motivo"] == "marca_demais"
+
+
+def test_guia_vazio_da_exatamente_o_a_priori(sujo):
+    assert teto_da_coluna(monta_entrada(sujo), "estado") == config.TETO_MARCACAO
+
+
+def test_guia_sem_a_coluna_da_o_a_priori(sujo):
+    entrada = monta_entrada(sujo, linhas_guia=(0, 1))
+    entrada.guia_linhas = entrada.guia_linhas[["cidade"]]
+    assert teto_da_coluna(entrada, "estado") == config.TETO_MARCACAO
+
+
+def test_guia_sem_sujeira_nao_aperta_o_teto_abaixo_do_a_priori():
+    # A margem sozinha (0,22) fica abaixo do a priori: marcar 25% tem de passar.
+    entrada = guia_de_taxa(0, 20, 25)
+    c = regra_ok()
+    assert crivar_deteccao([c], entrada) == [c]
+    assert c.metricas["teto"] == config.TETO_MARCACAO
+
+
+def test_a_margem_alarga_o_teto_acima_da_taxa_do_guia():
+    # Guia com 25% sujo: teto 0,47, e a regra marca 40%.
+    entrada = guia_de_taxa(5, 20, 35)
+    c = regra_ok()
+    assert crivar_deteccao([c], entrada) == [c]
+    assert c.metricas["taxa"] == 0.40
+
+
+def test_a_margem_diminui_quando_o_guia_cresce():
+    pequeno = teto_da_coluna(guia_de_taxa(5, 20, 0), "v")
+    grande = teto_da_coluna(guia_de_taxa(10, 40, 0), "v")
+    assert grande < pequeno
+
+
+def sujo_com_certificado():
+    sujo = pd.DataFrame({
+        "estado": ["MAA", "MA", "TX", "TX", "XX", "MA", "TX", "MA", "MA", "YY"],
+        "cidade": ["Boston"] * 10,
+    })
+    return monta_entrada(sujo, linhas_guia=(0,), corrigidos={(0, "estado"): "MA"})
+
+
+def test_veta_regra_de_valor_que_marca_valor_certificado():
+    entrada = sujo_com_certificado()
+    # Marca os MA das linhas 1, 5, 7 e 8; o guia certificou MA.
+    c = candidata("dominio", {"valores": ["MAA", "TX", "XX", "YY"]})
+    assert crivar_deteccao([c], entrada) == []
+    assert c.metricas["motivo"] == "marca_valor_certificado"
+
+
+def test_aprova_regra_de_valor_que_marca_so_valor_nao_certificado():
+    entrada = sujo_com_certificado()
+    c = candidata("dominio", {"valores": ["MAA", "MA", "TX"]})
+    assert crivar_deteccao([c], entrada) == [c]
+
+
+def test_veto_compara_valor_inteiro_e_nao_substring():
+    entrada = sujo_com_certificado()
+    entrada.sujo.at[4, "estado"] = "MAX"
+    c = candidata("dominio", {"valores": ["MAA", "MA", "TX", "YY"]})
+    assert crivar_deteccao([c], entrada) == [c]
+    assert c.metricas["marcadas"] == 1
+
+
+def test_dependencia_pode_marcar_valor_certificado():
+    # Linha 5 (Boston, TX) diverge da moda MA e TX esta certificado pela linha 6 do guia.
+    sujo = pd.DataFrame({
+        "estado": ["MA"] * 5 + ["TX", "TX"],
+        "cidade": ["Boston"] * 6 + ["Denver"],
+    })
+    entrada = monta_entrada(sujo, linhas_guia=(6,))
+    entrada.perfil.pares[("cidade", "estado")] = {
+        "det": 0.9, "n_grupos": 2, "n_divergentes": 1, "frac_ambiguos": 0.0
+    }
+    c = candidata("dependencia", {"determinantes": ["cidade"]})
+    assert crivar_deteccao([c], entrada) == [c]
+    assert c.metricas["marcadas"] == 1
+
+
+def test_sem_guia_nenhum_valor_e_certificado(sujo):
+    mascara = pd.Series(True, index=sujo.index)
+    assert not _marca_valor_certificado(monta_entrada(sujo), "estado", mascara)
+
+
+def coluna_xy(n_x, n_y):
+    """Coluna `v` com n_x celulas X, n_y celulas Y e o resto ok, sem guia."""
+    valores = ["X"] * n_x + ["Y"] * n_y + ["ok"] * (100 - n_x - n_y)
+    return monta_entrada(pd.DataFrame({"v": valores}))
+
+
+def par_de_tipos():
+    marca_x = candidata("dominio", {"valores": ["ok", "Y"]}, coluna="v")
+    marca_y = candidata("formato", {"regex": "ok|X"}, coluna="v")
+    return marca_x, marca_y
+
+
+def test_uniao_acima_do_teto_mantem_os_dois_tipos_e_grava_a_taxa():
+    # A regra de maior taxa pode ser a boa: o crivo nao descarta por uniao.
+    marca_x, marca_y = par_de_tipos()
+    entrada = coluna_xy(20, 15)
+    assert crivar_deteccao([marca_x, marca_y], entrada) == [marca_x, marca_y]
+    assert marca_x.metricas["taxa_uniao"] == marca_y.metricas["taxa_uniao"] == 0.35
+    assert marca_x.metricas["taxa_uniao"] > marca_x.metricas["teto"]
+    assert marca_x.metricas["motivo"] == marca_y.metricas["motivo"] == "aprovada"
+
+
+def test_uniao_que_cabe_no_teto_mantem_os_dois_tipos_e_grava_a_taxa():
+    marca_x, marca_y = par_de_tipos()
+    assert crivar_deteccao([marca_x, marca_y], coluna_xy(10, 15)) == [marca_x, marca_y]
+    assert marca_x.metricas["taxa_uniao"] == 0.25
+
+
+def test_uniao_conta_a_celula_marcada_pelas_duas_regras_uma_vez():
+    marca_x = candidata("dominio", {"valores": ["ok", "Y"]}, coluna="v")
+    marca_tudo_menos_ok = candidata("formato", {"regex": "ok"}, coluna="v")
+    assert len(crivar_deteccao([marca_x, marca_tudo_menos_ok], coluna_xy(10, 15))) == 2
+    assert marca_x.metricas["taxa_uniao"] == 0.25
+
+
+def test_a_ordem_da_lista_nao_muda_quem_sobrevive():
+    marca_x, marca_y = par_de_tipos()
+    entrada = coluna_xy(16, 16)
+    assert crivar_deteccao([marca_x, marca_y], entrada) == [marca_x, marca_y]
+    marca_x, marca_y = par_de_tipos()
+    assert crivar_deteccao([marca_y, marca_x], entrada) == [marca_y, marca_x]
+
+
+def guia_de_conformidade(n_fora, n=100, n_guia=20):
+    """Coluna `v` de dois digitos com n_fora celulas `X`; o guia e feito de linhas conformes."""
+    valores = ["X"] * n_fora + ["12"] * (n - n_fora)
+    return monta_entrada(pd.DataFrame({"v": valores}), linhas_guia=range(n_fora, n_fora + n_guia))
+
+
+def regra_de_conformidade():
+    return candidata("conformidade", {"padroes": ["9"]}, coluna="v")
+
+
+def test_conformidade_aprovada_acima_do_teto_da_coluna():
+    entrada = guia_de_conformidade(n_fora=60)
+    c = regra_de_conformidade()
+    assert c.metricas == {}
+    assert crivar_deteccao([c], entrada) == [c]
+    assert c.metricas["taxa"] == 0.6 > c.metricas["teto"]
+
+
+def test_teto_continua_valendo_para_os_outros_tipos():
+    entrada = guia_de_conformidade(n_fora=60)
+    c = candidata("formato", {"regex": "12"}, coluna="v")
+    assert crivar_deteccao([c], entrada) == []
+    assert c.metricas["motivo"] == "marca_demais"
+
+
+def test_conformidade_vacua_e_reprovada():
+    entrada = guia_de_conformidade(n_fora=0)
+    c = regra_de_conformidade()
+    assert crivar_deteccao([c], entrada) == []
+    assert c.metricas["motivo"] == "vacua"
+
+
+def test_conformidade_nunca_marca_celula_nem_valor_certificado():
+    entrada = guia_de_conformidade(n_fora=60)
+    c = candidatas_de_conformidade(entrada)[0]
+    assert c.parametros == {"padroes": ["9"]}
+    assert crivar_deteccao([c], entrada) == [c]

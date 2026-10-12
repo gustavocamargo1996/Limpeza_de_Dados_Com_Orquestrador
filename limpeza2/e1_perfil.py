@@ -4,29 +4,11 @@ from pathlib import Path
 import pandas as pd
 
 from limpeza2 import config
+from limpeza2.motor import padrao
 from limpeza2.tipos import Entrada, Perfil
 
 FREQUENTES = 15
 RAROS = 10
-
-
-def padrao(valor, nivel=1):
-    """Generaliza o valor em classes de caractere; 2 comprime com contagem, 3 sem."""
-    classes = "".join(
-        "A" if c.isupper() else "a" if c.islower() else "9" if c.isdigit() else c
-        for c in valor
-    )
-    if nivel == 1:
-        return classes
-    comprimido = []
-    for c in classes:
-        if comprimido and comprimido[-1][0] == c:
-            comprimido[-1][1] += 1
-        else:
-            comprimido.append([c, 1])
-    if nivel == 3:
-        return "".join(c for c, _ in comprimido)
-    return "".join(f"{c}{n}" if n > 1 else c for c, n in comprimido)
 
 
 def perfilar_coluna(serie):

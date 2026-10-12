@@ -47,7 +47,7 @@ que permite executá-las sem pandas no namespace do portão.
 ## O gate pergunta "a regra viu erro?" {#crivo-sem-vacuidade}
 
 **Decisão.** Cinco testes determinísticos, nenhum consultando o gabarito:
-controle negativo das linhas limpas do guia, não-vacuidade, teto de marcação,
+controle por célula do guia, não-vacuidade, teto de marcação,
 piso dos pares do guia, e fração de grupos ambíguos para dependências.
 
 **Por quê.** O gate da POC 1 aprovava uma regra que acertasse 100% das células
@@ -63,25 +63,82 @@ nenhum e passaria por vacuidade.
 
 ---
 
-## O teto de marcação é fixado a priori {#teto-de-marcacao}
+## O teto de marcação tem piso a priori e sobe com o guia {#teto-de-marcacao}
 
-**Decisão.** `TETO_MARCACAO = 0,30`, em `config.py`, escolhido sem olhar os
-dados.
+**Decisão.** O teto da coluna é `max(TETO_MARCACAO, taxa_suja_no_guia + 2 * sqrt(0,25 / n))`,
+em `e3_crivo.teto_da_coluna`. `TETO_MARCACAO = 0,30` continua em `config.py`,
+escolhido sem olhar os dados, e agora é o **piso**. `taxa_suja_no_guia` é a
+fração das `n` linhas do guia em que `sujo != guia` naquela coluna. Sem guia, ou
+sem a coluna no guia, o teto é exatamente 0,30. O teto usado fica em
+`candidata.metricas["teto"]`, para o relatório mostrar "marcou 98% e passou"
+junto de "porque o guia diz 100%".
 
-**Por quê.** Calibrar esse número exigiria medir a taxa real de erro por coluna,
-o que exige o gabarito. Seria vazamento. O valor está acima da taxa de erro por
-coluna dos datasets em uso e muito abaixo do que permitiria marcar a coluna
-inteira.
+**O que o teto fixo impedia.** No `beers`, `ounces` está errada em 295 de 300
+linhas (98%). Um teto de 30% proibia por construção qualquer regra que detectasse
+a coluna que concentra 60% dos erros do dataset: o recall ficava travado em cerca
+de 41%. A regra de formato escrita para `ounces` morria por `marca_demais`.
 
-**Consequência declarada.** Coluna com mais de 30% de erro é subdetectada. É
-limite do método. Trocar o número depois de ver um resultado ruim seria ajustar
-ao gabarito pela porta dos fundos.
+**Por que o guia resolve.** O teto fixo existia porque, sem informação, não se
+distingue "a regra marca demais" de "a coluna está quase toda errada". O guia
+distingue: a taxa de células sujas dele, por coluna, estima a taxa de erro da
+coluna, e `n` diz com que precisão.
+
+**A forma da margem.** É o erro padrão de uma proporção observada em `n` amostras,
+no pior caso (`p = 0,5`): `sqrt(0,25 / n)`, duas vezes para cerca de 95%. Com 20
+linhas a margem é 0,22; com 40, 0,16. Ela aperta sozinha quando o guia cresce, o
+que casa com `preparar_guia.py --linhas`. O `max` com o a priori não é enfeite:
+em coluna que o guia viu limpa, a taxa é 0 e a margem sozinha (0,22) ficaria
+abaixo de 0,30, apertando o teto e reprovando regra que antes passava.
+
+**Honestidade sobre a ordem dos fatos.** A **forma** da margem vem do argumento
+de erro amostral, que se sustenta lendo só o tamanho do guia. Mas o autor
+**verificou** que ela funciona nas duas tabelas comparando a taxa suja do guia
+com a taxa de erro real, e essa verificação usou o gabarito (`beers`: `ounces`
+1,00 contra 0,98 real, `ibu` 0,40 contra 0,37, `abv` 0,35 contra 0,23;
+`environment`: `State` 0,10 contra 0,18). É confirmação posterior: não foi o que
+escolheu a fórmula, e o número 2 não foi ajustado. A evidência é limitada: cobre
+**dois** datasets e **uma** semente de 20 linhas.
+
+**Consequência declarada.** O guia agora supervisiona também o teto: um guia
+pequeno e azarado pode subir o teto de uma coluna que é limpa (`Climate_Zone`:
+guia 0,20, real 0,09, teto 0,42). O custo é aceito porque os outros testes do
+crivo continuam valendo. A regra `^[A-Z]{2}$` que marcava 300 de 300 em `State`
+continua morrendo (teto 0,32), e esse caso não pode voltar.
+
+### Dois testes para o que o teto não alcança
+
+**Veto por valor certificado (`marca_valor_certificado`).** Em `ounces` o teto
+passa de 1 e `marca_demais` fica desligado, e o guia não tem célula correta de
+`ounces` para o controle por célula. O guia certifica valores: se uma regra dos
+tipos `formato`, `dominio`, `faixa` ou `ausente_disfarcado` marca célula cujo valor
+sujo é **igual** (não substring) a um valor do guia naquela coluna, ela se
+contradiz. Não vale para `dependencia`, em que o erro está no contexto da linha.
+Medido com o gabarito (confirmação posterior): células realmente erradas que
+carregam valor certificado: `beers` 0 de 495 nas cinco colunas com erro;
+`environment` `State` 49 de 54 e `Climate_Zone` 26 de 26 (as duas precisam de
+`dependencia`), 0 de 254 nas outras cinco. Posição: logo após `marca_celula_correta`,
+por ser a mesma evidência direta de falso positivo.
+
+**União por coluna: tentada e removida (`uniao_acima_do_teto`).** A escolha entre
+variantes é por `(coluna, tipo)`, então tipos diferentes coexistem e a máscara
+final é a união, que nenhum teto examinava. Tentou-se um portão: se a união
+passasse do teto da coluna, descartava-se o tipo de maior taxa, até caber. Ele
+falhou por construção, porque descarta a regra boa: ela marca mais justamente por
+achar todos os erros. Caso reproduzido em `environment` `Temperature`: a regra de
+`formato` `-?\d+(\.\d+)?` marca 56 células, todas erradas (precisão 1,000); uma
+`ausente_disfarcado` de 22 sentinelas marca 52, com 8 erradas (precisão 0,154); a
+união, 100 células (0,3333), passa do teto de 0,3236, e o portão mantinha a ruim e
+descartava a boa. O buraco que ele fechava, dois tipos somando e marcando tudo, é
+menor que o dano, e ele não sabe qual regra é boa. Hoje o crivo só grava a
+`taxa_uniao` da coluna em `metricas` de cada regra que sobrevive, como informação
+para o relatório de raciocínio ("as regras desta coluna somadas marcam 33%, acima
+do que o guia sustenta"), nunca como critério.
 
 ### `DET_MINIMO` é o complemento deste número
 
 `DET_MINIMO = 0.70`: uma dependência entre colunas só vira candidata se valer em
-pelo menos 70% das linhas. **É a mesma premissa de `TETO_MARCACAO`, dita uma vez
-só.** Se o projeto declara não acreditar que uma coluna esteja mais de 30%
+pelo menos 70% das linhas. **É a mesma premissa do piso de `TETO_MARCACAO`, dita uma
+vez só.** Se o projeto declara não acreditar que uma coluna esteja mais de 30%
 errada, então uma dependência verdadeira não pode falhar em mais de 30% das
 linhas.
 
@@ -203,11 +260,32 @@ invariante verificável por import, em vez de uma convenção que depende de
 disciplina. O teste de vazamento fica trivial: nenhum módulo de `limpeza2/`
 importa nenhum dos dois.
 
-**Sobre o sorteio.** Decisão do usuário: até 20 linhas sorteadas entre as que
-estão 100% corretas (20 é teto: medido, o `beers` tem **5** linhas 100% limpas
-em 300, e o guia dele ficou com exatamente essas cinco), e até 2 pares `sujo → limpo` por coluna que tem erro. A cota por
-coluna imita o humano varrendo coluna a coluna e garante exemplo onde o sorteio
-puro não chegaria. Gerado uma vez, commitado, igual entre runs.
+**Sobre o sorteio.** Decisão do usuário, revista em 12/10/2026. *Era:* até 20
+linhas sorteadas entre as que estavam 100% corretas no sujo, usadas só como
+"não mexa". *Passa a ser:* 20 linhas sorteadas de **qualquer** parte da tabela,
+com os valores do **CSV limpo**, mais até 2 pares `sujo → limpo` por coluna que
+tem erro. O guia é a referência de um humano que pegou algumas linhas e as
+deixou corretas. Gerado uma vez por semente, commitado, igual entre runs; cada
+pasta traz `guia_receita.txt` (dataset, semente, linhas, pares por coluna),
+registro para humano que nenhum módulo lê.
+
+*Motivo.* O critério antigo rendia 5 linhas no `beers` (`ounces` errada em 295
+de 300) e dependia de a tabela ter linhas perfeitas por sorte. O novo dá sempre
+20, e o `ounces` limpo (`12`, `16`, `8.4`) mostra o formato certo contra catorze
+variantes sujas.
+
+*Efeito no crivo.* O controle negativo passa a ser por célula, só na coluna da
+regra: reprova (`marca_celula_correta`) quem marca célula do guia com
+`sujo == guia`; marcar célula com `sujo != guia` é correto. No reparo, onde ele
+escreveu em célula do guia o valor tem de ser o do guia
+(`corrompe_celula_do_guia`); não escrever não reprova *nesse* teste. A coluna-alvo
+cobra o valor certo mesmo sem escrita, pelo piso do par
+(`#par-exige-valor-exato`), que vale também para as células sujas do guia.
+
+*Custo.* Mais supervisão: 20 × 11 = 220 células rotuladas no lugar de 55 no
+`beers`, usadas como oráculo de correção. Ela tem de ser reportada ao lado de
+cada número. `preparar_guia.py` aceita `--linhas`, `--pares` e `--destino` para
+medir quanto o tamanho do guia compra.
 
 **Braço sem guia.** A mesma espinha com os dois CSVs vazios, para medir quanto o
 guia vale.
@@ -334,6 +412,14 @@ dela sem condição reprovaria reparo válido por célula que ele nunca toca (pa
 um par de `onca` reprove um reparo de `estado`. Linha de par fora da máscara não
 é verificada: a detecção não a marcou.
 
+**Células sujas do guia valem como par.** Na coluna-alvo, célula do guia com
+`sujo != guia` que esteja na máscara exige `novo == guia`, mesmo que o reparo não
+tenha escrito: é o mesmo piso do par explícito, com o mesmo motivo
+(`perde_par_do_guia`). Só a coluna **determinante** é poupada quando o reparo não
+escreveu nela. Na **detecção** as células sujas do guia não entram no piso: isso
+exigiria marcar todas e rejeitaria regra que pega só um dos tipos de erro da
+coluna. Pendência da parte 2.
+
 **O preço.** Mudança de comportamento: estratégias como `esvaziar` e
 `vizinho_no_dominio`, que não alcançam o valor exato do par, passam a ser
 reprovadas. Troca deliberada de precisão a mais por recall a menos.
@@ -350,3 +436,67 @@ públicas que não podem sair da rede. Um typo que caísse silenciosamente para
 OpenAI mandaria a tabela do usuário para fora.
 
 **Provedor desta POC.** OpenAI, modelo `gpt-5.6-luna`, nome e chave no `.env`.
+
+---
+
+## Conformidade de schema {#conformidade-de-schema}
+
+**Problema.** Um único juiz, o teto estatístico de marcação, servia a todo tipo
+de erro. Para coluna de tipo claro (numérico com uma decimal, inteiro, data) a
+pergunta é lógica, não estatística: "este valor obedece ao formato da coluna?".
+Rotear esse caso fácil por um juiz desenhado para o difícil custou meia sessão
+tentando tirar um `℃` de uma coluna numérica.
+
+**O que o mapeamento prescreve.** Os três estudos concordam: inferir o tipo da
+coluna primeiro e derivar a restrição dele. O **BClean+** usa o LLM só para
+rotular o tipo semântico e sintetiza a regex; a ablação sem isso derruba o F1 em
+0,36 e o leva a zero no `flights`. O **CatDB** deriva as regras de forma
+determinística de um catálogo por coluna. O **Cocoon** põe caractere e padrão
+antes da dependência funcional e reporta F1 de 0,99 em tipo de coluna.
+
+**Decisão.** `conformidade.py` deriva, das células que o guia certificou, o
+conjunto de `padrao(v, 3)` de cada coluna e emite uma `Candidata` de tipo
+`conformidade`. `motor.detectar` marca a célula cujo padrão não está no conjunto.
+Não há LLM, e a etapa só detecta: a correção fica com o especificador. `padrao`
+mora em `motor.py`, e não em `e1_perfil.py`, porque o limpador gerado leva só o
+texto do motor e o tipo precisa dela em tempo de execução. O nível vem de
+`motor.NIVEL_SCHEMA`, uma só constante para derivar e para aplicar.
+
+**Por que o nível 3 e não o 2.** O nível 2 codifica a quantidade de caracteres:
+`index`, que vai de `0` a `299`, tem os padrões `9`, `92` e `929`, e 20 linhas
+amostram algumas larguras, não todas. O schema ficava sensível a um acidente da
+amostra, não a uma propriedade da coluna, e a coluna limpa era marcada com
+precisão 0,000. O nível 3 descarta a contagem (`0`, `12` e `299` viram `9`), e o
+argumento independe do gabarito. *Confirmação posterior, com o gabarito:* nível 2
+alcança 634 de 829 erros com precisão 0,924; nível 3, 678 de 829 com 0,943.
+`ibu` sobe a precisão de 0,957 para 1,000, `city` passa a ser alcançada inteira
+(9 de 9) e `index`, `id`, `brewery_id` e `PM2.5` deixam de ser marcadas.
+
+**O corte de um terço.** A coluna tem schema se os padrões distintos forem no
+máximo um terço das linhas do guia (6 em 20). É limiar a priori, declarado em
+`config.FRACAO_PADROES_SCHEMA`.
+
+**Medição no nível 3 (guia canônico, gabarito só para medir).** Precisão e
+recall: `ounces` 1,000 e 1,000; `state` 1,000 e 1,000; `abv` 0,972 e 1,000; `ibu`
+1,000 e 1,000; `Temperature`, `Measurement_Date` e `Monitoring_Station_ID` 1,000
+e 1,000; `city` 0,562 e 1,000 (16 marcadas, 9 erradas). `State` e `Climate_Zone`
+têm schema apertado e marcam zero, porque os erros são siglas válidas: a
+abstenção é o sinal de roteamento para a dependência funcional. `Project_Name`
+ganha schema de 3 padrões e marca 36 células, 35 erradas (precisão 0,972, recall
+0,625), mas o crivo a reprova por `perde_par_do_guia`.
+
+**O custo, e uma opção não aplicada.** `brewery-name` passa a ter schema com 6
+padrões e marca 31 células, todas certas (precisão 0,000), e o crivo a aprova.
+Apertar o corte para um quarto (5 em 20) excluiria `brewery-name` e levaria a
+precisão a 0,985 com recall de 678 de 829. **Não foi aplicado:** não há argumento
+independente do gabarito para escolher um quarto e não um terço, e aplicá-lo seria
+ajustar o limiar olhando a resposta. Fica como decisão do usuário.
+
+**Por que o teto não se aplica.** A restrição vem de dado que o humano
+certificou, não de chute do LLM, então limitar por taxa não faz sentido: se a
+coluna está 98% fora do schema, 98% é a verdade (em `ounces` o teto chega a
+1,224 e seria vácuo de todo jeito). Continuam valendo a não-vacuidade e o piso do
+par. `marca_celula_correta` e o veto por valor certificado não disparam por
+construção, já que célula certificada conforma ao schema derivado dela mesma; o
+crivo os mantém ativos para `conformidade` como alarme de que o schema não está
+saindo das células certificadas.

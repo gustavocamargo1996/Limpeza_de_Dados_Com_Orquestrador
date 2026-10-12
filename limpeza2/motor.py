@@ -1,7 +1,29 @@
 """Unica implementacao de aplicacao de regra; o limpador gerado embute este texto."""
 import pandas as pd
 
-TIPOS = ("formato", "dominio", "faixa", "ausente_disfarcado", "dependencia")
+NIVEL_SCHEMA = 3
+TIPOS = (
+    "formato", "dominio", "faixa", "ausente_disfarcado", "dependencia", "conformidade"
+)
+
+
+def padrao(valor, nivel=1):
+    """Generaliza o valor em classes de caractere; 2 comprime com contagem, 3 sem."""
+    classes = "".join(
+        "A" if c.isupper() else "a" if c.islower() else "9" if c.isdigit() else c
+        for c in valor
+    )
+    if nivel == 1:
+        return classes
+    comprimido = []
+    for c in classes:
+        if comprimido and comprimido[-1][0] == c:
+            comprimido[-1][1] += 1
+        else:
+            comprimido.append([c, 1])
+    if nivel == 3:
+        return "".join(c for c, _ in comprimido)
+    return "".join(f"{c}{n}" if n > 1 else c for c, n in comprimido)
 
 
 def detectar(df, coluna, tipo, parametros, dominancia=0.70):
@@ -9,6 +31,8 @@ def detectar(df, coluna, tipo, parametros, dominancia=0.70):
     if tipo == "dependencia":
         return divergentes_da_moda(df, parametros["determinantes"], coluna, dominancia)
     serie = df[coluna].astype(str)
+    if tipo == "conformidade":
+        return ~serie.map(lambda v: padrao(v, NIVEL_SCHEMA)).isin(parametros["padroes"])
     if tipo == "formato":
         return ~serie.str.fullmatch(parametros["regex"], na=False)
     if tipo == "dominio":

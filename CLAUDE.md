@@ -56,17 +56,18 @@ dois artefatos, com donos e momentos diferentes:
 |---|---|---|
 | Quando entra | na **geração** | só na **validação** |
 | Obrigatório? | **não**: o limpador tem de ser gerado mesmo só com o sujo | sim, para medir |
-| Tamanho | pequeno: cerca de **20 linhas limpas** e **poucos pares `sujo → limpo`** | a tabela limpa inteira |
-| Quem produz, num caso real | um humano que abre o dataset e, por inspeção visual, separa algumas linhas certas e alguns erros grosseiros com a correção | já existe (benchmark) ou é construído à parte |
+| Tamanho | pequeno: **20 linhas corrigidas** e **poucos pares `sujo → limpo`** | a tabela limpa inteira |
+| Quem produz, num caso real | um humano que abre o dataset e, por inspeção visual, pega algumas linhas, deixa-as corretas e aponta alguns erros grosseiros com a correção | já existe (benchmark) ou é construído à parte |
 | Para que serve | um few-shot: mostrar ao LLM o schema, o formato de cada campo, o relacionamento entre campos e exemplos de erro | medir se o limpador é bom |
 
-As 20 linhas são um **teto, não uma garantia**. Medido em 12/10/2026: o
-`beers_dirty_300` tem apenas **5 linhas sem nenhum erro**, porque a coluna
-`ounces` está errada em 295 das 300 linhas; o `environment_dirty_300` tem 85.
-Onde não houver 20 linhas totalmente limpas, o guia sai menor, e o tamanho real
-dele é reportado ao lado de cada número. A consequência é que no `beers` o
-controle negativo fica fraco — 5 linhas vezes 11 colunas, 55 células — e isso
-precisa ser dito ao reportar o resultado desse dataset.
+As 20 linhas são sorteadas de **qualquer** parte da tabela, com os valores do
+CSV limpo, e há sempre 20, em qualquer dataset. O guia é uma referência
+corrigida: o humano pegou algumas linhas e as deixou corretas. **Orçamento de
+supervisão:** 20 linhas inteiramente corretas, isto é, 20 × 11 = **220 células
+rotuladas** num dataset de 11 colunas, mais até 2 pares por coluna com erro. O
+crivo usa essas células como oráculo de correção (não só como "não mexa"), e
+isso é mais supervisão que a do critério antigo: ela é reportada ao lado de
+cada número. Ver `docs/DECISOES.md#guia-sorteado`.
 
 **O gabarito nunca é lido pela geração**, nem para amostrar, nem para validar
 regra, nem para escolher parâmetro. A geração lê o sujo e o guia, e só. Se o
@@ -81,9 +82,10 @@ Consequências para o desenho:
 - Com guia pequeno, **não dá para aprovar uma regra por "acertar 100% dos
   rotulados"** como na POC 1: há poucos pares, escolhidos por serem erros
   grosseiros, e o gate passaria por vacuidade na maioria das colunas
-  (`HANDOFF.md` §4, lição 6). As linhas limpas do guia, porém, servem de
-  **controle negativo**: uma regra que altera ou marca uma célula que o humano
-  disse estar certa está errada.
+  (`HANDOFF.md` §4, lição 6). As linhas do guia, porém, servem de
+  **oráculo por célula**: uma regra que marca ou altera uma célula que o sujo
+  já tinha certa está errada, e um reparo que escreve numa célula do guia um
+  valor diferente do guia também.
 - Nos benchmarks, o guia precisa ser **reprodutível**: fixado em arquivo,
   versionado e igual entre runs. O jeito de produzi-lo (escolhido à mão pelo
   usuário ou simulado por um procedimento com semente fixa) é decisão do
@@ -91,16 +93,34 @@ Consequências para o desenho:
 
 ---
 
-## 2. Teto de tamanho: metade da POC 1
+## 2. Teto de tamanho: dois terços da POC 1
 
-Requisito explícito do usuário. A POC 1 tinha **26 arquivos `.py` e 2.810
-linhas** de código de produção (fora `tests/`). Esta POC tem de caber em:
+A POC 1 tinha **26 arquivos `.py` e 2.810 linhas** de código de produção (fora
+`tests/`). Esta POC tem de caber em:
 
-| Medida | Teto |
-|---|---|
-| arquivos `.py` fora de `tests/` | **13**, e **15** no limite, só com necessidade demonstrada |
-| linhas nesses arquivos | **1.400** |
-| maior arquivo | **200 linhas** |
+| Medida | Teto | Fração da POC 1 |
+|---|---|---|
+| arquivos `.py` fora de `tests/` | **16** | 62% |
+| linhas nesses arquivos | **1.800** | 64% |
+| maior arquivo | **200 linhas** | — |
+
+**O requisito original era metade: 13 arquivos e 1.400 linhas.** O usuário o
+elevou em 12/10/2026, com a parte 1 em 911 linhas e a parte 2 projetada em mais
+700. A causa é rastreável e não foi desleixo: a parte 1 foi estimada em cerca de
+700 linhas e entregou 911, e as 211 a mais são o controle negativo por célula, o
+teto informado pelo guia, o veto por valor certificado, a correção do
+determinismo do reparo e a simetria do piso do guia — cada uma aprovada
+separadamente, e cada uma consertando um defeito achado por revisão ou por prova
+por mutação.
+
+**Isto tem de ser declarado ao reportar**, na dissertação inclusive: a POC 2 não
+cumpre o "metade da POC 1" que o usuário pediu no começo. Ela cumpre dois terços,
+e a diferença comprou os cinco mecanismos acima. Omitir isso seria apresentar um
+número que o projeto não alcançou.
+
+**Reserva conhecida:** `limpeza2/__init__.py` está vazio e a suíte passa sem ele
+— verificado em 12/10/2026. Se a parte 2 precisar de um décimo sétimo arquivo,
+essa é a vaga livre, e não um pedido para subir o teto de novo.
 
 **O que o teto de arquivos protege não é a contagem, é a legibilidade.** O risco
 que o usuário quer evitar é se perder na função de cada `.py` por estarem muito
@@ -113,8 +133,7 @@ fracionados. Então valem duas regras, e a segunda manda mais que o número:
   função, nunca pelo tamanho. Um arquivo de 190 linhas com uma função clara é
   melhor que dois de 95 com funções difusas.
 
-Os dois arquivos de folga existem para esse caso, não para acomodar desenho
-novo.
+A folga de arquivos existe para esse caso, não para acomodar desenho novo.
 
 Meça antes de todo commit que acrescenta código:
 
@@ -237,7 +256,9 @@ limpeza2/
   config.py             # modelo, caminhos, limiares, semente
   provedor.py           # entrega o cliente do provedor de LLM escolhido
   portao.py             # valida o Python gerado antes de deixa-lo rodar
-  motor.py              # UNICA implementacao de aplicacao de regra
+  motor.py              # UNICA implementacao de aplicacao de regra (inclui `padrao`)
+  conformidade.py       # deriva o schema de cada coluna das celulas que o guia certificou
+  limites.py            # calcula os limites que o guia sustenta para uma coluna
   e1_perfil.py          # etapa 1: perfila a tabela suja, lida como texto literal
   e2_detector.py        # etapa 2: agente detector -> predicados candidatos
   e3_crivo.py           # etapa 3: reprova a regra candidata que nao se sustenta
@@ -249,8 +270,8 @@ preparar_guia.py        # fora do pacote: sorteia o guia com semente fixa
 medir.py                # fora do pacote: executa o limpador gerado e mede
 ```
 
-Quatorze arquivos, cada um com uma função que cabe numa frase. A seção 2 admite até
-quinze, e a folga é para quando `e6_codificador.py` ou `motor.py` passarem de 200
+Quinze arquivos, cada um com uma função que cabe numa frase. A seção 2 admite até
+quinze, e este é o limite: não resta folga. Ela existia para quando `e6_codificador.py` ou `motor.py` passarem de 200
 linhas: aí separa-se a parte que tem função própria, nunca se fraciona pelo
 tamanho.
 

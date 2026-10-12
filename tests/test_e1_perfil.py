@@ -2,7 +2,8 @@
 import pandas as pd
 import pytest
 
-from limpeza2.e1_perfil import padrao, perfilar, perfilar_coluna, perfilar_par
+from limpeza2.e1_perfil import perfilar, perfilar_coluna, perfilar_par
+from limpeza2.motor import padrao
 
 
 @pytest.mark.parametrize(

@@ -1,4 +1,4 @@
-"""Sorteia o guia com semente fixa: linhas certas e pares sujo->limpo."""
+"""Sorteia o guia com semente fixa: linhas corrigidas e pares sujo->limpo."""
 import argparse
 
 import pandas as pd
@@ -9,13 +9,10 @@ from limpeza2 import config
 def sortear(sujo, limpo, semente, n_linhas, pares_por_coluna):
     """Devolve (guia_linhas, guia_pares) sorteados com semente fixa."""
     diferentes = sujo != limpo
-    corretas = pd.Series(list(sujo.index[~diferentes.any(axis=1)]))
-    escolhidas = corretas.sample(
-        n=min(n_linhas, len(corretas)), random_state=semente
-    ).tolist()
-    # As linhas escolhidas sao identicas nos dois arquivos por construcao,
-    # entao tomar do sujo torna o guia derivavel do sujo mais os indices.
-    guia_linhas = sujo.loc[sorted(escolhidas)].copy()
+    todas = pd.Series(list(sujo.index))
+    escolhidas = todas.sample(n=min(n_linhas, len(todas)), random_state=semente).tolist()
+    # Os valores vem do limpo: o guia e referencia corrigida, nao copia do sujo.
+    guia_linhas = limpo.loc[sorted(escolhidas)].copy()
 
     registros = []
     for coluna in sujo.columns:
@@ -39,17 +36,19 @@ def sortear(sujo, limpo, semente, n_linhas, pares_por_coluna):
     return guia_linhas, guia_pares
 
 
-def gravar(dataset, sujo, limpo):
-    """Grava os CSVs do guia em dados/guia/<dataset>/ e devolve caminhos e contagens."""
-    linhas, pares = sortear(
-        sujo, limpo, config.SEMENTE, config.LINHAS_GUIA, config.PARES_POR_COLUNA
-    )
-    destino = config.GUIA / dataset
-    destino.mkdir(parents=True, exist_ok=True)
-    caminho_linhas = destino / "guia_linhas.csv"
-    caminho_pares = destino / "guia_pares.csv"
+def gravar(dataset, sujo, limpo, semente, n_linhas, pares_por_coluna, destino=None):
+    """Grava os CSVs e a receita do guia em dados/guia/<destino ou dataset>/."""
+    linhas, pares = sortear(sujo, limpo, semente, n_linhas, pares_por_coluna)
+    pasta = config.GUIA / (destino or dataset)
+    pasta.mkdir(parents=True, exist_ok=True)
+    caminho_linhas = pasta / "guia_linhas.csv"
+    caminho_pares = pasta / "guia_pares.csv"
     linhas.to_csv(caminho_linhas, index=True, index_label="_linha", encoding="utf-8")
     pares.to_csv(caminho_pares, index=False, encoding="utf-8")
+    receita = {"dataset": dataset, "semente": semente, "linhas": n_linhas,
+               "pares_por_coluna": pares_por_coluna}
+    texto = "".join(f"{chave}={valor}\n" for chave, valor in receita.items())
+    (pasta / "guia_receita.txt").write_text(texto, encoding="utf-8", newline="\n")
     return caminho_linhas, caminho_pares, len(linhas), len(pares)
 
 
@@ -58,11 +57,16 @@ def main():
     ap.add_argument("--dataset", required=True)
     ap.add_argument("--sujo", required=True)
     ap.add_argument("--limpo", required=True)
+    ap.add_argument("--linhas", type=int, default=config.LINHAS_GUIA)
+    ap.add_argument("--pares", type=int, default=config.PARES_POR_COLUNA)
+    ap.add_argument("--destino", help="pasta sob dados/guia/; padrao: o dataset")
     args = ap.parse_args()
 
     sujo = pd.read_csv(args.sujo, **config.LER_CSV)
     limpo = pd.read_csv(args.limpo, **config.LER_CSV)
-    caminho_linhas, caminho_pares, n_linhas, n_pares = gravar(args.dataset, sujo, limpo)
+    caminho_linhas, caminho_pares, n_linhas, n_pares = gravar(
+        args.dataset, sujo, limpo, config.SEMENTE, args.linhas, args.pares, args.destino
+    )
     print(f"guia de {args.dataset}: {n_linhas} linhas, {n_pares} pares")
     print(f"  {caminho_linhas}")
     print(f"  {caminho_pares}")

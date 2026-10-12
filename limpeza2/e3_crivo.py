@@ -5,8 +5,8 @@ from limpeza2 import config
 from limpeza2.motor import detectar, reparar
 
 MOTIVOS = (
-    "aprovada", "toca_linha_limpa", "vacua", "marca_demais",
-    "perde_par_do_guia", "ambigua", "sem_perfil", "lancou", "nao_repara",
+    "aprovada", "marca_celula_correta", "vacua", "marca_demais", "perde_par_do_guia",
+    "ambigua", "sem_perfil", "lancou", "nao_repara", "corrompe_celula_do_guia",
 )
 
 
@@ -62,9 +62,8 @@ def _reprovar(candidata, entrada, mascara):
             return "sem_perfil"
         if par["frac_ambiguos"] > config.TETO_AMBIGUIDADE:
             return "ambigua"
-    linhas_limpas = entrada.guia_linhas.index.intersection(entrada.sujo.index)
-    if len(linhas_limpas) and bool(mascara.loc[linhas_limpas].any()):
-        return "toca_linha_limpa"
+    if _celulas_certas(entrada, candidata.coluna, mascara):
+        return "marca_celula_correta"
     if candidata.metricas["marcadas"] == 0:
         return "vacua"
     if candidata.metricas["taxa"] > config.TETO_MARCACAO:
@@ -78,8 +77,17 @@ def _reprovar(candidata, entrada, mascara):
     return None
 
 
+def _celulas_certas(entrada, coluna, mascara):
+    """Linhas do guia em que a celula ja estava certa no sujo e a mascara marca."""
+    if coluna not in entrada.guia_linhas.columns:
+        return False
+    linhas = entrada.guia_linhas.index.intersection(entrada.sujo.index)
+    certas = entrada.sujo.loc[linhas, coluna] == entrada.guia_linhas.loc[linhas, coluna]
+    return bool(mascara.loc[linhas][certas].any())
+
+
 def crivar_reparo(propostas, entrada, funcoes=None):
-    """Reprova o reparo que toca linha limpa, perde par do guia ou nao repara nada."""
+    """Reprova o reparo que corrompe o guia, perde par ou nao repara nada."""
     aprovados = []
     for proposta in propostas:
         candidata = proposta.candidata
@@ -107,12 +115,8 @@ def crivar_reparo(propostas, entrada, funcoes=None):
 
 def _reprovar_reparo(entrada, novo, reparada, proposta, mascara):
     """O motivo da reprovacao do reparo, ou None se ele passar."""
-    linhas_limpas = entrada.guia_linhas.index.intersection(entrada.sujo.index)
-    if len(linhas_limpas):
-        antes = entrada.sujo.loc[linhas_limpas]
-        depois = novo.loc[linhas_limpas, antes.columns]
-        if not antes.equals(depois):
-            return "toca_linha_limpa"
+    if _escreveu_errado_no_guia(entrada, novo):
+        return "corrompe_celula_do_guia"
     if int(reparada.sum()) == 0:
         return "nao_repara"
     # Ver docs/DECISOES.md#par-exige-valor-exato: nao consulta `reparada`.
@@ -130,3 +134,13 @@ def _reprovar_reparo(entrada, novo, reparada, proposta, mascara):
             if novo.at[linha, coluna] != par["limpo"]:
                 return "perde_par_do_guia"
     return None
+
+
+def _escreveu_errado_no_guia(entrada, novo):
+    """Ha celula do guia que o reparo escreveu com valor diferente do guia."""
+    linhas = entrada.guia_linhas.index.intersection(entrada.sujo.index)
+    colunas = entrada.guia_linhas.columns.intersection(entrada.sujo.columns)
+    antes = entrada.sujo.loc[linhas, colunas]
+    guia = entrada.guia_linhas.loc[linhas, colunas]
+    escreveu = novo.loc[linhas, colunas] != antes
+    return bool((escreveu & (novo.loc[linhas, colunas] != guia)).any(axis=None))

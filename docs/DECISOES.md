@@ -47,7 +47,7 @@ que permite executá-las sem pandas no namespace do portão.
 ## O gate pergunta "a regra viu erro?" {#crivo-sem-vacuidade}
 
 **Decisão.** Cinco testes determinísticos, nenhum consultando o gabarito:
-controle negativo das linhas limpas do guia, não-vacuidade, teto de marcação,
+controle por célula do guia, não-vacuidade, teto de marcação,
 piso dos pares do guia, e fração de grupos ambíguos para dependências.
 
 **Por quê.** O gate da POC 1 aprovava uma regra que acertasse 100% das células
@@ -203,11 +203,31 @@ invariante verificável por import, em vez de uma convenção que depende de
 disciplina. O teste de vazamento fica trivial: nenhum módulo de `limpeza2/`
 importa nenhum dos dois.
 
-**Sobre o sorteio.** Decisão do usuário: até 20 linhas sorteadas entre as que
-estão 100% corretas (20 é teto: medido, o `beers` tem **5** linhas 100% limpas
-em 300, e o guia dele ficou com exatamente essas cinco), e até 2 pares `sujo → limpo` por coluna que tem erro. A cota por
-coluna imita o humano varrendo coluna a coluna e garante exemplo onde o sorteio
-puro não chegaria. Gerado uma vez, commitado, igual entre runs.
+**Sobre o sorteio.** Decisão do usuário, revista em 12/10/2026. *Era:* até 20
+linhas sorteadas entre as que estavam 100% corretas no sujo, usadas só como
+"não mexa". *Passa a ser:* 20 linhas sorteadas de **qualquer** parte da tabela,
+com os valores do **CSV limpo**, mais até 2 pares `sujo → limpo` por coluna que
+tem erro. O guia é a referência de um humano que pegou algumas linhas e as
+deixou corretas. Gerado uma vez por semente, commitado, igual entre runs; cada
+pasta traz `guia_receita.txt` (dataset, semente, linhas, pares por coluna),
+registro para humano que nenhum módulo lê.
+
+*Motivo.* O critério antigo rendia 5 linhas no `beers` (`ounces` errada em 295
+de 300) e dependia de a tabela ter linhas perfeitas por sorte. O novo dá sempre
+20, e o `ounces` limpo (`12`, `16`, `8.4`) mostra o formato certo contra catorze
+variantes sujas.
+
+*Efeito no crivo.* O controle negativo passa a ser por célula, só na coluna da
+regra: reprova (`marca_celula_correta`) quem marca célula do guia com
+`sujo == guia`; marcar célula com `sujo != guia` é correto. No reparo, onde ele
+escreveu em célula do guia o valor tem de ser o do guia
+(`corrompe_celula_do_guia`); não escrever não reprova, pela mesma razão do piso
+do par (`#par-exige-valor-exato`).
+
+*Custo.* Mais supervisão: 20 × 11 = 220 células rotuladas no lugar de 55 no
+`beers`, usadas como oráculo de correção. Ela tem de ser reportada ao lado de
+cada número. `preparar_guia.py` aceita `--linhas`, `--pares` e `--destino` para
+medir quanto o tamanho do guia compra.
 
 **Braço sem guia.** A mesma espinha com os dois CSVs vazios, para medir quanto o
 guia vale.

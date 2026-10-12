@@ -6,10 +6,13 @@ from limpeza2.e3_crivo import _reprovar_reparo, crivar_deteccao, crivar_reparo
 from limpeza2.tipos import Candidata, Entrada, Perfil, Reparo
 
 
-def monta_entrada(sujo, linhas_guia=(), pares=()):
-    guia_linhas = sujo.loc[list(linhas_guia)] if linhas_guia else pd.DataFrame(
+def monta_entrada(sujo, linhas_guia=(), pares=(), corrigidos=None):
+    """O guia traz o valor do sujo, salvo nas celulas de `corrigidos` {(linha, coluna): valor}."""
+    guia_linhas = sujo.loc[list(linhas_guia)].copy() if linhas_guia else pd.DataFrame(
         columns=sujo.columns
     )
+    for (linha, coluna), valor in (corrigidos or {}).items():
+        guia_linhas.at[linha, coluna] = valor
     guia_pares = pd.DataFrame(
         list(pares), columns=["linha", "coluna", "sujo", "limpo"]
     ) if pares else pd.DataFrame(columns=["linha", "coluna", "sujo", "limpo"])
@@ -64,11 +67,28 @@ def test_reprova_regra_que_marca_a_coluna_inteira(sujo):
     assert c.metricas["motivo"] == "marca_demais"
 
 
-def test_reprova_regra_que_toca_linha_limpa_do_guia(sujo):
+def test_reprova_regra_que_marca_celula_correta_do_guia(sujo):
     entrada = monta_entrada(sujo, linhas_guia=(0, 1, 2))
     c = candidata("dominio", {"valores": ["TX"]})
     assert crivar_deteccao([c], entrada) == []
-    assert c.metricas["motivo"] == "toca_linha_limpa"
+    assert c.metricas["motivo"] == "marca_celula_correta"
+
+
+def test_aprova_regra_que_marca_so_celula_errada_do_guia(sujo):
+    # A linha 4 (XX) esta no guia corrigida para MA: marcar o XX e o certo.
+    entrada = monta_entrada(sujo, linhas_guia=(4,), corrigidos={(4, "estado"): "MA"})
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    assert crivar_deteccao([c], entrada) == [c]
+    assert c.metricas["marcadas"] == 2
+    assert c.metricas["motivo"] == "aprovada"
+
+
+def test_controle_negativo_so_olha_a_coluna_da_candidata(sujo):
+    # O guia nao tem a coluna `estado`: nada a comparar, e a regra segue para os outros testes.
+    entrada = monta_entrada(sujo, linhas_guia=(0, 4))
+    entrada.guia_linhas = entrada.guia_linhas[["cidade"]]
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    assert crivar_deteccao([c], entrada) == [c]
 
 
 def test_reprova_regra_que_perde_par_do_guia(sujo):
@@ -158,7 +178,7 @@ def test_crivar_reparo_guarda_contra_reparo_fora_da_mascara(sujo):
     c = candidata("dominio", {"valores": ["MA", "TX"]})
     r = Reparo(candidata=c, estrategia="dicionario", parametros={}, raciocinio="x")
     mascara = pd.Series(False, index=novo.index)
-    assert _reprovar_reparo(entrada, novo, reparada, r, mascara) == "toca_linha_limpa"
+    assert _reprovar_reparo(entrada, novo, reparada, r, mascara) == "corrompe_celula_do_guia"
 
 
 def test_crivar_reparo_aprova_quem_repara_e_respeita_o_guia(sujo):
@@ -272,3 +292,49 @@ def test_crivar_reparo_responde_por_determinante_que_escreveu_valor_errado():
     )
     assert crivar_reparo([r], entrada) == []
     assert c.metricas["motivo_reparo"] == "perde_par_do_guia"
+
+
+def _reparo_por_mapa(sujo, mapa, **guia):
+    entrada = monta_entrada(sujo, linhas_guia=(4,), **guia)
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    crivar_deteccao([c], entrada)
+    r = Reparo(candidata=c, estrategia="dicionario", parametros={"mapa": mapa}, raciocinio="x")
+    return entrada, c, r
+
+
+def test_crivar_reparo_reprova_quem_escreve_valor_errado_no_guia(sujo):
+    entrada, c, r = _reparo_por_mapa(
+        sujo, {"XX": "TX", "YY": "MA"}, corrigidos={(4, "estado"): "MA"}
+    )
+    assert crivar_reparo([r], entrada) == []
+    assert c.metricas["motivo_reparo"] == "corrompe_celula_do_guia"
+
+
+def test_crivar_reparo_aprova_quem_escreve_valor_certo_no_guia(sujo):
+    entrada, c, r = _reparo_por_mapa(
+        sujo, {"XX": "MA", "YY": "MA"}, corrigidos={(4, "estado"): "MA"}
+    )
+    assert crivar_reparo([r], entrada) == [r]
+    assert c.metricas["motivo_reparo"] == "aprovada"
+
+
+def test_crivar_reparo_aprova_quem_nao_toca_celula_errada_do_guia(sujo):
+    # Nao escrever e falha de alcance, nao corrupcao: a linha 4 continua XX.
+    entrada, c, r = _reparo_por_mapa(
+        sujo, {"YY": "MA"}, corrigidos={(4, "estado"): "MA"}
+    )
+    assert crivar_reparo([r], entrada) == [r]
+    assert c.metricas["motivo_reparo"] == "aprovada"
+
+
+def test_crivar_reparo_reprova_quem_escreve_em_celula_certa_do_guia(sujo):
+    # A linha 0 esta certa (MA); o reparo a reescreve: e o antigo toca_linha_limpa.
+    entrada = monta_entrada(sujo, linhas_guia=(0,))
+    novo = entrada.sujo.copy()
+    novo.at[0, "estado"] = "TX"
+    reparada = pd.Series(False, index=novo.index)
+    reparada.loc[4] = True
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    r = Reparo(candidata=c, estrategia="dicionario", parametros={}, raciocinio="x")
+    mascara = pd.Series(False, index=novo.index)
+    assert _reprovar_reparo(entrada, novo, reparada, r, mascara) == "corrompe_celula_do_guia"

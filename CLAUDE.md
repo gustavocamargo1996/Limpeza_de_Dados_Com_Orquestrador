@@ -56,17 +56,18 @@ dois artefatos, com donos e momentos diferentes:
 |---|---|---|
 | Quando entra | na **geração** | só na **validação** |
 | Obrigatório? | **não**: o limpador tem de ser gerado mesmo só com o sujo | sim, para medir |
-| Tamanho | pequeno: cerca de **20 linhas limpas** e **poucos pares `sujo → limpo`** | a tabela limpa inteira |
-| Quem produz, num caso real | um humano que abre o dataset e, por inspeção visual, separa algumas linhas certas e alguns erros grosseiros com a correção | já existe (benchmark) ou é construído à parte |
+| Tamanho | pequeno: **20 linhas corrigidas** e **poucos pares `sujo → limpo`** | a tabela limpa inteira |
+| Quem produz, num caso real | um humano que abre o dataset e, por inspeção visual, pega algumas linhas, deixa-as corretas e aponta alguns erros grosseiros com a correção | já existe (benchmark) ou é construído à parte |
 | Para que serve | um few-shot: mostrar ao LLM o schema, o formato de cada campo, o relacionamento entre campos e exemplos de erro | medir se o limpador é bom |
 
-As 20 linhas são um **teto, não uma garantia**. Medido em 12/10/2026: o
-`beers_dirty_300` tem apenas **5 linhas sem nenhum erro**, porque a coluna
-`ounces` está errada em 295 das 300 linhas; o `environment_dirty_300` tem 85.
-Onde não houver 20 linhas totalmente limpas, o guia sai menor, e o tamanho real
-dele é reportado ao lado de cada número. A consequência é que no `beers` o
-controle negativo fica fraco — 5 linhas vezes 11 colunas, 55 células — e isso
-precisa ser dito ao reportar o resultado desse dataset.
+As 20 linhas são sorteadas de **qualquer** parte da tabela, com os valores do
+CSV limpo, e há sempre 20, em qualquer dataset. O guia é uma referência
+corrigida: o humano pegou algumas linhas e as deixou corretas. **Orçamento de
+supervisão:** 20 linhas inteiramente corretas, isto é, 20 × 11 = **220 células
+rotuladas** num dataset de 11 colunas, mais até 2 pares por coluna com erro. O
+crivo usa essas células como oráculo de correção (não só como "não mexa"), e
+isso é mais supervisão que a do critério antigo: ela é reportada ao lado de
+cada número. Ver `docs/DECISOES.md#guia-sorteado`.
 
 **O gabarito nunca é lido pela geração**, nem para amostrar, nem para validar
 regra, nem para escolher parâmetro. A geração lê o sujo e o guia, e só. Se o
@@ -81,9 +82,10 @@ Consequências para o desenho:
 - Com guia pequeno, **não dá para aprovar uma regra por "acertar 100% dos
   rotulados"** como na POC 1: há poucos pares, escolhidos por serem erros
   grosseiros, e o gate passaria por vacuidade na maioria das colunas
-  (`HANDOFF.md` §4, lição 6). As linhas limpas do guia, porém, servem de
-  **controle negativo**: uma regra que altera ou marca uma célula que o humano
-  disse estar certa está errada.
+  (`HANDOFF.md` §4, lição 6). As linhas do guia, porém, servem de
+  **oráculo por célula**: uma regra que marca ou altera uma célula que o sujo
+  já tinha certa está errada, e um reparo que escreve numa célula do guia um
+  valor diferente do guia também.
 - Nos benchmarks, o guia precisa ser **reprodutível**: fixado em arquivo,
   versionado e igual entre runs. O jeito de produzi-lo (escolhido à mão pelo
   usuário ou simulado por um procedimento com semente fixa) é decisão do

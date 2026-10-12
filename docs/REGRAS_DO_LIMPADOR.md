@@ -63,34 +63,38 @@ executado e medido contra o CSV limpo.
 | Artefato | A geração lê? | Por quê |
 |---|---|---|
 | CSV sujo | sim | é a entrada |
-| `guia_linhas.csv`: 20 linhas que um humano confirmou estarem corretas | sim | mostra schema, formato de cada campo e como os campos se relacionam |
+| `guia_linhas.csv`: 20 linhas sorteadas, com os valores corrigidos (do limpo) | sim | mostra schema, formato de cada campo e como os campos se relacionam |
 | `guia_pares.csv`: poucos pares `sujo → limpo`, até 2 por coluna | sim | mostra que cara tem um erro grosseiro |
 | CSV limpo completo (o gabarito) | **nunca** | se vazar, a POC mede memorização e todo número publicado vira ficção |
 | `FunctionalDependency.txt` e `TypeConstraint.txt` do benchmark | **nunca** | são conhecimento de especialista; descobrir as dependências é justamente o trabalho da POC |
 | `real_examples.txt` do benchmark | **nunca** | o guia é sempre o nosso, sorteado com semente fixa |
+| `guia_receita.txt` | não | registro para humano de qual semente e tamanho geraram a pasta; nenhum módulo de `limpeza2/` o lê |
 
 As linhas que aparecem no guia **saem da medição**. Medir nelas mediria o que o
 LLM viu, não o que ele generalizou.
 
-### Quantas linhas o guia tem de verdade
+### Quantas linhas o guia tem de verdade, e quanto ele supervisiona
 
-As 20 linhas são o que se pede, não o que sempre se consegue. O guia só aceita
-linhas em que **nenhuma** célula está errada, e há tabelas em que isso é raro.
-Medido nos dois datasets em uso:
+São sempre 20, sorteadas entre **todas** as linhas da tabela, e os valores vêm
+do CSV limpo: o guia é a referência que um humano teria deixado correta. O
+critério anterior exigia linhas sem erro nenhum no sujo e rendia 5 linhas no
+`beers`, porque a coluna `ounces` está errada em 295 das 300. Medido com a
+semente fixa, nos dois datasets em uso:
 
-| Dataset | Linhas sem erro nenhum, em 300 | Por quê |
-|---|---|---|
-| `environment` | 85 | os erros se espalham por sete colunas, e a maioria das linhas tem um ou dois |
-| `beers` | **5** | a coluna `ounces` está errada em 295 das 300 linhas, então quase toda linha tem ao menos esse erro |
+| Dataset | Linhas | Células rotuladas | Células que o sujo tem erradas | Pares |
+|---|---|---|---|---|
+| `beers` | 20 | 220 | **35** (as 20 de `ounces`, 7 de `abv`, 8 de `ibu`) | 10 |
+| `environment` | 20 | 220 | 18 (em 13 linhas) | 14 |
 
-Então o guia do `beers` sai com 5 linhas, não 20. Isso não é defeito: é o que um
-humano também encontraria ao procurar linhas impecáveis numa tabela cuja coluna
-principal está quase toda errada. O efeito prático é que **no `beers` o controle
-negativo é fraco** — cinco linhas vezes onze colunas dão 55 células em que a
-regra não pode mexer. Os outros três testes do crivo não dependem dessas linhas,
-então a proteção não desaparece; ela afina.
+As células erradas do guia são pares `sujo → limpo` implícitos. O `ounces` limpo
+tem só `12`, `16` e `8.4`; o sujo tem catorze variantes do mesmo número, então o
+guia mostra o formato certo e a regra tem de reproduzi-lo.
 
-O tamanho real do guia é publicado junto de cada número, sempre.
+**O custo é supervisão.** São 220 células rotuladas, mais os pares, e o crivo as
+usa como oráculo de correção. Isso é mais rótulo que o critério antigo, e o
+tamanho do guia (linhas, pares e células sujas) vai ao lado de cada número. O
+tamanho é parâmetro de `preparar_guia.py` (`--linhas`, `--pares`, `--destino`)
+para medir quanto o guia compra, e cada pasta traz um `guia_receita.txt`.
 
 ---
 
@@ -274,7 +278,7 @@ passar por cinco testes. Nenhum deles consulta o gabarito.
 
 | # | Teste | A regra é reprovada quando | O que isso impede |
 |---|---|---|---|
-| 1 | **controle negativo** | ela marca ou altera qualquer célula das 20 linhas que o humano disse estarem corretas | regra que estraga dado bom |
+| 1 | **controle por célula** | ela marca uma célula do guia que o sujo já tinha certa (`sujo == guia`, na coluna da regra) | regra que estraga dado bom |
 | 2 | **não-vacuidade** | ela não marca nenhuma célula da tabela suja | regra que nunca viu um erro ser aprovada no silêncio |
 | 3 | **teto de marcação** | ela marca mais que 30% da coluna | a regra "marca tudo" |
 | 4 | **piso do guia** | existem pares `sujo → limpo` naquela coluna e ela não marca todos | regra que ignora o erro que o humano apontou |
@@ -285,8 +289,9 @@ deixou de errar?", pergunta "a regra viu erro?"**. O número de células que cad
 regra marcou entra no relatório de raciocínio, inclusive o zero, para a
 vacuidade ficar visível em vez de silenciosa.
 
-Em coluna sem par no guia, o teste 4 simplesmente não se aplica, e os testes 1,
-2 e 3 decidem sozinhos. Era exatamente aí que o gate da POC 1 ficava vazio.
+Marcar uma célula do guia em que `sujo != guia` é **correto** e não reprova: é
+exatamente o erro que a regra deveria achar. Em coluna sem par no guia, o teste 4
+simplesmente não se aplica, e os testes 1, 2 e 3 decidem sozinhos. Era exatamente aí que o gate da POC 1 ficava vazio.
 
 Três variantes de cada regra são geradas, e entre as que sobrevivem fica a de
 **menor taxa de marcação** que ainda passa no piso. É a escolha conservadora, e é
@@ -332,8 +337,9 @@ Cada estratégia vem com três frases de justificativa do LLM — padrão
 identificado, análise do erro, transformação — e essas frases vão para o
 relatório de raciocínio.
 
-Depois de escolhida, a estratégia passa pelo crivo **de novo**: ela não pode
-alterar nenhuma célula das linhas limpas do guia, tem de reproduzir os pares
+Depois de escolhida, a estratégia passa pelo crivo **de novo**: onde ela
+escreve numa célula do guia o valor tem de ser o do guia (`corrompe_celula_do_guia`;
+não escrever não reprova), tem de reproduzir os pares
 `sujo → limpo` daquela coluna, e tem de reparar pelo menos uma célula detectada.
 
 ---
@@ -353,7 +359,7 @@ A etapa 5 faz uma última tentativa, **na geração**, nunca em execução:
    todas as linhas da mesma entidade, e enxerga a redundância entre elas.
 3. Recebe `{valor_sujo: valor_limpo}` com uma justificativa por entrada, e
    `null` onde o LLM não sabe.
-4. Passa pelo crivo: nenhuma entrada pode alterar célula limpa do guia.
+4. Passa pelo crivo: nenhuma entrada pode escrever em célula do guia um valor diferente do guia.
 5. **É congelado como texto literal dentro do limpador.**
 
 O passo 2 não é detalhe. A ablação do IterClean mostra que agrupar o prompt pela
@@ -405,7 +411,7 @@ quantas vieram do dicionário residual.
 A comparação com a POC 1 **favorece a POC 1**, e isso precisa ser dito sempre
 que os números forem reportados. A POC 1 recebeu cerca de 10 células rotuladas
 por coluna, sorteadas do limpo completo, mais tudo o que um oráculo rotulou em
-cinco iterações de refino. Esta POC recebe, no máximo, 20 linhas limpas e dois
+cinco iterações de refino. Esta POC recebe 20 linhas corrigidas (220 células) e até dois
 pares por coluna. **Empatar usando menos rótulo já é avanço.** O tamanho do guia
 vai ao lado de cada número.
 

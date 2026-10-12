@@ -755,7 +755,9 @@ Expected: PASS, 6 testes. Se `test_reproduz_o_placar_da_poc_1` falhar, **pare**:
 
 - [ ] **Step 6: Prova por mutação**
 
-Mutação A: trocar `tp = int((mudanca & (corrigido == limpo)).sum())` por `tp = int(mudanca.sum())`. `test_f1_reparo_conta_so_a_mudanca_que_acertou` e `test_reproduz_o_placar_da_poc_1` têm de FALHAR. Reverter.
+Mutação A: trocar `tp = int((mudanca & (corrigido == limpo)).sum())` por `tp = int(mudanca.sum())`. `test_f1_reparo_conta_so_a_mudanca_que_acertou` tem de FALHAR. Reverter.
+
+**O teste do placar NÃO falha com essa mutação, e isso foi medido.** Os limpadores congelados da POC 1 têm precisão de 100%, então nos dois datasets `mudanca.sum() == tp` — 121 de 121 e 44 de 44. A consequência é maior que a mutação: **`avaliar` nunca é exercitada com precisão abaixo de 100%**, e a POC 2 pode perfeitamente produzir limpador impreciso. Por isso esta tarefa também exige um teste com um **limpador mínimo escrito em `tmp_path`**, que acerta uma célula, erra outra de propósito e marca uma terceira como flag, expõe `aplicar_detalhado` com uma tabela de `fontes` conhecida, e afirma valores exatos: erros, mudanças, tp, flags, precisão abaixo de 1, recall, e a decomposição por fonte. Esse teste é o que trava a soma agregada e o ramo de `fontes`, que de outro modo ficariam sem cobertura nenhuma no módulo que produz os números publicados.
 
 Mutação B: trocar `manter = sujo.index.difference(...)` por `manter = sujo.index`. `test_holdout_reduz_os_erros_contados` tem de FALHAR. Reverter.
 

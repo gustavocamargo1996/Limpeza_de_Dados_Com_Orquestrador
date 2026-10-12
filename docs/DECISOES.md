@@ -572,6 +572,12 @@ restringir.
 resposta crua gravada em `respostas.jsonl`. `PROVEDOR=gravado` refaz a geração a
 partir dele.
 
+**A origem viaja com as respostas.** O primeiro registro do `respostas.jsonl` é
+`{"origem": {"provedor", "modelo", "esforco"}}`, gravado ao abrir a geração. No
+replay, o cliente lê a origem dali e a regrava no novo arquivo, e o cabeçalho do
+limpador e o `.md` imprimem essa origem, não o `config` corrente. Assim o replay
+reproduz o limpador byte a byte (`tests/test_espinha.py`).
+
 **Por quê.** A geração por LLM não é reprodutível bit a bit, nem com temperatura
 zero. O invariante do `CLAUDE.md` §8 trava o **artefato congelado** e a geração a
 partir das respostas congeladas; diferença entre dois runs pagos não é regressão.
@@ -601,3 +607,22 @@ chave errada. Um run truncado pelo teto carrega a marca no próprio limpador
 próprio valor contavam como reparo sem mudar nada, e uma regra assim passaria pelo
 `nao_repara` do crivo. Mudança de comportamento num caso de borda, feita junto com
 a simplificação do `reparar` na parte 2.
+
+---
+
+## A função que lança numa célula vira flag {#funcao-que-lanca}
+
+**Decisão.** Em `motor.reparar`, se a função escalar (`corrigir_<n>`, ou outra
+estratégia escalar) lança numa célula, a célula fica marcada e não reparada, isto
+é, vira flag. A tabela segue. Na geração, o codificador passa a função na fumaça
+com **todos** os valores marcados distintos da tabela de origem, mais os exemplos
+do guia; o prompt continua levando só os `VALORES_NO_PROMPT` primeiros.
+
+**Por quê.** O limpador é aplicado a tabelas novas, e nelas um valor inédito pode
+fazer a função lançar. Derrubar a tabela inteira por uma célula perde tudo o que as
+outras regras corrigiram. Na tabela de origem, a degradação nunca acontece em
+silêncio: a função que lança em algum valor marcado é rejeitada pelo portão antes
+de chegar ao crivo. A fumaça final do limpador continua pegando o que quebra ao
+carregar o módulo. Uma função que lança em **toda** célula marcada não repara nada
+e cai no crivo como `nao_repara`; `lancou` fica para o que lança fora da célula
+(função ausente, coluna inexistente).

@@ -51,6 +51,18 @@ def test_moda_escreve_tambem_no_determinante():
     assert not flags.any(axis=None)
 
 
+def test_funcao_que_lanca_numa_celula_vira_flag_e_nao_derruba_a_tabela():
+    def corrigir_1(valor):
+        if valor == "N/A":
+            raise ValueError("valor inedito")
+        return valor.replace(" oz", "")
+    regras = [regra("onca", "dominio", {"valores": ["12", "16"]}, "normalizar", {"funcao": "corrigir_1"})]
+    novo, flags, fontes = aplicar_regras(oncas(), regras, {}, {"corrigir_1": corrigir_1})
+    assert list(novo["onca"]) == ["12", "12", "16", "N/A", "16"]
+    assert list(flags["onca"]) == [False, False, False, True, False]
+    assert fontes.at[1, "onca"] == "dominio/normalizar"
+
+
 def test_residual_age_so_em_celula_marcada_e_nao_reparada():
     regras = [regra("onca", "dominio", {"valores": ["12", "16"]})]
     residual = {"onca": {"12 oz": "12", "16": "dezesseis"}}

@@ -11,7 +11,7 @@ from limpeza2.motor import detectar, reparar
 MOTIVOS = (
     "aprovada", "marca_celula_correta", "vacua", "marca_demais", "perde_par_do_guia",
     "ambigua", "sem_perfil", "lancou", "nao_repara", "corrompe_celula_do_guia",
-    "marca_valor_certificado",
+    "marca_valor_certificado", "superada",
 )
 TIPOS_DE_VALOR = ("formato", "dominio", "faixa", "ausente_disfarcado", "conformidade")
 
@@ -30,6 +30,9 @@ def crivar_deteccao(candidatas, entrada):
     for coluna in {c for c, _ in vencedoras}:
         _gravar_uniao([v for (c, _), v in vencedoras.items() if c == coluna])
     finais = {id(c) for c, _ in vencedoras.values()}
+    for c in candidatas:
+        if c.metricas.get("motivo") == "aprovada" and id(c) not in finais:
+            c.metricas["motivo"] = "superada"
     return [c for c in candidatas if id(c) in finais]
 
 
@@ -185,7 +188,7 @@ def crivar_residual(residuais, entrada):
             if any(s == sujo and c != limpo for s, c in exemplos):
                 residual.caidas[sujo] = "contradiz_o_guia"
             elif sujo in certificados:
-                # Sem excecao: a chave do dicionario nao carrega contexto.
+                # Ver docs/DECISOES.md#residual-congelado: no dicionario o veto nao tem excecao.
                 residual.caidas[sujo] = "valor_certificado"
             else:
                 continue

@@ -1,4 +1,6 @@
 """O provedor: falha alto no desconhecido, degrada com nome no resto, e reproduz."""
+import json
+
 import httpx2
 import openai
 import pytest
@@ -79,6 +81,20 @@ def test_gravado_reproduz_a_geracao_na_mesma_ordem(tmp_path, monkeypatch):
     with pytest.raises(provedor.FalhaDoLLM) as erro:
         pedir(copia, "c2")
     assert erro.value.motivo == "cortada"
+
+
+def test_gravado_devolve_a_origem_gravada_e_a_regrava(tmp_path, monkeypatch):
+    original = provedor.Cliente(tmp_path / "a", em_fila(ok({"x": 1})))
+    pedir(original)
+    monkeypatch.setattr(config, "MODELO", "outro-modelo")
+    monkeypatch.setattr(config, "PROVEDOR", "gravado")
+    monkeypatch.setattr(config, "RESPOSTAS_GRAVADAS", str(tmp_path / "a" / "respostas.jsonl"))
+    copia = provedor.iniciar(tmp_path / "b")
+    assert copia.origem == original.origem
+    assert copia.origem["modelo"] != "outro-modelo"
+    assert pedir(copia) == {"x": 1}
+    primeira = (tmp_path / "b" / "respostas.jsonl").read_text(encoding="utf-8").splitlines()[0]
+    assert json.loads(primeira) == {"origem": original.origem}
 
 
 def test_gravado_sem_a_resposta_levanta(tmp_path, monkeypatch):

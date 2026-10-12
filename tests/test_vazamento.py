@@ -79,11 +79,11 @@ def test_geracao_so_abre_o_sujo_o_guia_e_o_motor(tmp_path, roteiro, monkeypatch)
     guia = raiz / "dados" / "guia" / "beers"
     destino = tmp_path / "beers_vazamento"
     roteiro(lambda instrucao, conteudo: {})
-    abertos = []
+    abertos, lidos_csv = [], []
     ler_csv, abrir = pd.read_csv, io.open
 
     def espia_csv(caminho, *args, **kwargs):
-        abertos.append(Path(caminho).resolve())
+        lidos_csv.append(Path(caminho).resolve())
         return ler_csv(caminho, *args, **kwargs)
 
     def espia_open(arquivo, *args, **kwargs):
@@ -96,8 +96,11 @@ def test_geracao_so_abre_o_sujo_o_guia_e_o_motor(tmp_path, roteiro, monkeypatch)
     monkeypatch.setattr(builtins, "open", espia_open)
     gerar_limpador(sujo, guia, destino)
 
-    permitidos = {sujo.resolve(), (guia / "guia_linhas.csv").resolve(),
-                  (guia / "guia_pares.csv").resolve(), e6_codificador.MOTOR.resolve()}
-    assert abertos, "nada foi aberto: a espia nao estaria espiando"
-    intrusos = [p for p in abertos if p not in permitidos and destino.resolve() not in p.parents]
+    csvs = {sujo.resolve(), (guia / "guia_linhas.csv").resolve(), (guia / "guia_pares.csv").resolve()}
+    permitidos = csvs | {e6_codificador.MOTOR.resolve()}
+    # Cada espia tem de ver o que lhe cabe: o pandas tambem passa pelo open, e esconderia a outra.
+    assert csvs <= set(lidos_csv), f"a espia de read_csv nao viu {csvs - set(lidos_csv)}"
+    assert permitidos <= set(abertos), f"a espia de open nao viu {permitidos - set(abertos)}"
+    intrusos = [p for p in abertos + lidos_csv
+                if p not in permitidos and destino.resolve() not in p.parents]
     assert not intrusos, f"a geracao abriu {intrusos}: so o sujo, o guia e o motor podem ser lidos"

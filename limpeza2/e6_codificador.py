@@ -50,10 +50,10 @@ def _funcao(proposta, entrada):
     c = proposta.candidata
     mascara = detectar(entrada.sujo, c.coluna, c.tipo, c.parametros, config.DOMINANCIA_MODA).fillna(False)
     exemplos = exemplos_do_guia(entrada, c.coluna)
-    amostras = sorted(set(entrada.sujo.loc[mascara, c.coluna]))[: config.VALORES_NO_PROMPT]
+    marcados = sorted(set(entrada.sujo.loc[mascara, c.coluna]))
     conteudo = "\n".join([
         f"coluna: {c.coluna}", f"transformacao: {proposta.parametros['transformacao']}",
-        f"valores a corrigir: {amostras}",
+        f"valores a corrigir: {marcados[: config.VALORES_NO_PROMPT]}",
         *[f"exemplo do guia: {s!r} -> {limpo!r}" for s, limpo in exemplos],
     ])
     for _ in range(2):
@@ -62,12 +62,12 @@ def _funcao(proposta, entrada):
                 "codificador", f"{c.coluna}/{c.tipo}", INSTRUCAO, conteudo, ESQUEMA)
             codigo = str(resposta.get("codigo"))
             funcao = portao.materializar(codigo)
-            portao.testar_fumaca(funcao, amostras + [s for s, _ in exemplos])
+            portao.testar_fumaca(funcao, marcados + [s for s, _ in exemplos])
         except provedor.FalhaDoLLM:
             # Degradacao nomeada: a regra fica sem reparo; o motivo esta no registro.
             return None
         except portao.CodigoRejeitado as erro:
-            c.metricas["detalhe_reparo"] = str(erro)
+            c.metricas["tentativa_rejeitada"] = str(erro)
             conteudo += f"\n\nA tentativa anterior foi rejeitada: {erro}\ncodigo rejeitado:\n{codigo}"
             continue
         proposta.codigo = codigo
@@ -112,7 +112,7 @@ def escrever(deteccoes, reparos, residual, todas, entrada, destino):
     cliente = provedor.cliente()
     teto = sum(n["status"] == "teto" for n in cliente.registro)
     caminho = destino / f"limpador_{destino.name}.py"
-    texto = _limpador(deteccoes, reparos, residual, entrada, cliente.chamadas, teto, destino.name)
+    texto = _limpador(deteccoes, reparos, residual, entrada, cliente, teto, destino.name)
     # newline="" grava o motor com os bytes que ele tem no disco.
     caminho.write_text(texto, encoding="utf-8", newline="")
     (destino / f"raciocinio_{destino.name}.md").write_text(
@@ -132,12 +132,12 @@ def renomear(codigo, nome):
     return ast.unparse(arvore)
 
 
-def _limpador(deteccoes, reparos, residual, entrada, chamadas, teto, nome):
+def _limpador(deteccoes, reparos, residual, entrada, cliente, teto, nome):
     """O texto do limpador: cabecalho, motor lido do disco, literais e funcoes renomeadas."""
     motor = MOTOR.read_text(encoding="utf-8", newline="")
     funcoes = [(r.parametros["funcao"], r.codigo) for r in reparos if r.estrategia == "normalizar"]
     return "\n".join([
-        _cabecalho(entrada, chamadas, nome),
+        _cabecalho(entrada, cliente.origem, cliente.chamadas, nome),
         "import argparse",
         "import re",
         "",
@@ -156,12 +156,12 @@ def _limpador(deteccoes, reparos, residual, entrada, chamadas, teto, nome):
     ])
 
 
-def _cabecalho(entrada, chamadas, nome):
+def _cabecalho(entrada, origem, chamadas, nome):
     """A docstring do limpador: origem, modelo, braco, aviso do portao e as memorias congeladas."""
     braco = ("sem guia" if entrada.guia_linhas.empty else
              f"guia de {len(entrada.guia_linhas)} linhas e {len(entrada.guia_pares)} pares")
     return (f'"""Limpador gerado pela POC 2 de limpeza de dados: {nome}.\n\n'
-            f"Modelo {config.MODELO} ({config.PROVEDOR}), {chamadas} chamadas; {braco}.\n\n"
+            f"Modelo {origem['modelo']} ({origem['provedor']}), {chamadas} chamadas; {braco}.\n\n"
             "AVISO: este arquivo roda SEM o portao AST que validou as funcoes corrigir_* na geracao.\n"
             "Revise antes de usar em producao.\n\n"
             "Memoria congelada: RESIDUAL e o dominio de vizinho_no_dominio valem para valores\n"
@@ -173,7 +173,7 @@ def _raciocinio(todas, reparos, residual, entrada, cliente, teto, nome):
     reparo_de = {id(r.candidata): r for r in reparos}
     nao_ok = [n for n in cliente.registro if n["status"] != "ok"]
     linhas = [f"# Raciocinio do limpador {nome}", "",
-              f"- modelo: {config.MODELO} ({config.PROVEDOR}), raciocinio {config.ESFORCO_RACIOCINIO}",
+              "- modelo: {modelo} ({provedor}), raciocinio {esforco}".format(**cliente.origem),
               f"- supervisao: {len(entrada.guia_linhas) * len(entrada.sujo.columns)} celulas do guia + {len(entrada.guia_pares)} pares",
               f"- chamadas: {cliente.chamadas}; tokens: {sum(n['tokens'] for n in cliente.registro)}",
               f"- unidades sem regra pelo teto de chamadas: {teto}"]

@@ -125,10 +125,11 @@ def test_entre_variantes_fica_a_que_marca_menos(sujo):
     estreita = candidata("dominio", {"valores": ["MA", "TX", "YY"]})
     sobreviventes = crivar_deteccao([larga, estreita], entrada)
     assert sobreviventes == [estreita]
-    assert larga.metricas["motivo"] == "aprovada"
+    assert (larga.metricas["motivo"], estreita.metricas["motivo"]) == ("superada", "aprovada")
     assert larga.metricas["marcadas"] == 2
     assert estreita.metricas["marcadas"] == 1
     assert crivar_deteccao([estreita, larga], entrada) == [estreita]
+    assert larga.metricas["motivo"] == "superada"
 
 
 def test_reprova_taxa_acima_do_teto_sem_ser_a_coluna_inteira(sujo):
@@ -240,6 +241,20 @@ def test_crivar_reparo_ignora_par_de_outra_coluna(sujo):
 
 
 def test_crivar_reparo_reprova_estrategia_que_lanca(sujo):
+    # A funcao ausente lanca fora da celula, antes de qualquer reparo.
+    entrada = monta_entrada(sujo)
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    crivar_deteccao([c], entrada)
+    r = Reparo(
+        candidata=c, estrategia="normalizar", parametros={"funcao": "ausente"},
+        raciocinio="x",
+    )
+    assert crivar_reparo([r], entrada, {}) == []
+    assert c.metricas["motivo_reparo"] == "lancou"
+
+
+def test_crivar_reparo_reprova_funcao_que_lanca_em_toda_celula(sujo):
+    # Ver docs/DECISOES.md#funcao-que-lanca: cada celula vira flag, e sem reparo a regra cai.
     entrada = monta_entrada(sujo)
     c = candidata("dominio", {"valores": ["MA", "TX"]})
     crivar_deteccao([c], entrada)
@@ -250,7 +265,7 @@ def test_crivar_reparo_reprova_estrategia_que_lanca(sujo):
     def explode(valor):
         raise ValueError("falha de proposito")
     assert crivar_reparo([r], entrada, {"explode": explode}) == []
-    assert c.metricas["motivo_reparo"] == "lancou"
+    assert c.metricas["motivo_reparo"] == "nao_repara"
 
 
 def test_crivar_reparo_nao_responde_por_determinante_que_nao_escreveu(sujo):

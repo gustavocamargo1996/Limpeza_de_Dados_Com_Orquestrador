@@ -2,7 +2,7 @@
 import pandas as pd
 import pytest
 
-from limpeza2 import e6_codificador, provedor
+from limpeza2 import config, e6_codificador, provedor
 from limpeza2.tipos import Candidata, Reparo, Residual
 from tests.apoio import monta_entrada
 
@@ -45,14 +45,33 @@ def test_rejeitada_duas_vezes_cai(roteiro):
     codificadas, funcoes = e6_codificador.codificar([p], monta_entrada(oncas()))
     assert (codificadas, funcoes) == ([], {})
     assert p.candidata.metricas["motivo_reparo"] == "codigo_rejeitado"
-    assert "import proibido" in p.candidata.metricas["detalhe_reparo"]
+    assert "import proibido" in p.candidata.metricas["tentativa_rejeitada"]
     assert len(api.pedidos) == 2
+
+
+def test_aprovada_na_segunda_tentativa_guarda_a_rejeitada_com_nome_proprio(roteiro):
+    respostas = [{"codigo": RUIM}, {"codigo": BOM}]
+    roteiro(lambda instrucao, conteudo: respostas.pop(0))
+    p = proposta()
+    e6_codificador.codificar([p], monta_entrada(oncas()))
+    assert "detalhe_reparo" not in p.candidata.metricas
+    assert "import proibido" in p.candidata.metricas["tentativa_rejeitada"]
 
 
 def test_funcao_que_lanca_com_valor_real_e_rejeitada(roteiro):
     lanca = "def corrigir(valor):\n    return valor[10]"
     roteiro(lambda instrucao, conteudo: {"codigo": lanca})
     codificadas, _ = e6_codificador.codificar([proposta()], monta_entrada(oncas()))
+    assert codificadas == []
+
+
+def test_fumaca_cobre_valor_marcado_que_nao_coube_no_prompt(roteiro):
+    marcados = [f"x{i:02d}" for i in range(config.VALORES_NO_PROMPT + 5)]
+    lanca_no_ultimo = f"def corrigir(valor):\n    if valor == {marcados[-1]!r}:\n        raise ValueError('fim')\n    return valor"
+    api = roteiro(lambda instrucao, conteudo: {"codigo": lanca_no_ultimo})
+    tabela = pd.DataFrame({"onca": ["12", "16"] + marcados})
+    codificadas, _ = e6_codificador.codificar([proposta()], monta_entrada(tabela))
+    assert marcados[-1] not in api.pedidos[0][1]
     assert codificadas == []
 
 
@@ -135,8 +154,9 @@ def test_raciocinio_lista_a_reprovada(tmp_path, roteiro):
 
 
 def test_funcao_quebrada_derruba_a_fumaca_final(tmp_path, roteiro):
+    # Quebra ao carregar o modulo; a que lanca por celula vira flag (DECISOES.md#funcao-que-lanca).
     with pytest.raises(NameError):
-        gerar(tmp_path, roteiro, codigo="def corrigir(valor):\n    return valor + desconhecida")
+        gerar(tmp_path, roteiro, codigo="def corrigir(valor=desconhecida):\n    return valor")
 
 
 def test_renomear_troca_so_o_nome_da_funcao():

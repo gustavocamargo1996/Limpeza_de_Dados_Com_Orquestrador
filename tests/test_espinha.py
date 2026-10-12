@@ -1,7 +1,7 @@
 """A espinha de ponta a ponta, com o duble no lugar do LLM."""
 from pathlib import Path
 
-from limpeza2 import e2_detector, e4_especificador, e5_residual, e6_codificador
+from limpeza2 import config, e2_detector, e4_especificador, e5_residual, e6_codificador, provedor
 from limpeza2.espinha import gerar_limpador
 from medir import avaliar, linhas_do_guia
 
@@ -61,6 +61,19 @@ def test_mesma_geracao_mesmo_limpador(tmp_path, roteiro):
     a = gerar_limpador(SUJO, GUIA, tmp_path / "a" / "beers_teste")
     b = gerar_limpador(SUJO, GUIA, tmp_path / "b" / "beers_teste")
     assert a.read_bytes() == b.read_bytes()
+
+
+def test_replay_gravado_reproduz_o_limpador_byte_a_byte(tmp_path, roteiro, monkeypatch):
+    construir = provedor._construir_api
+    roteiro(responder_beers)
+    original = gerar_limpador(SUJO, GUIA, tmp_path / "a" / "beers_teste")
+    monkeypatch.setattr(provedor, "_construir_api", construir)
+    monkeypatch.setattr(config, "PROVEDOR", "gravado")
+    monkeypatch.setattr(config, "RESPOSTAS_GRAVADAS", str(original.parent / "respostas.jsonl"))
+    copia = gerar_limpador(SUJO, GUIA, tmp_path / "b" / "beers_teste")
+    assert copia.read_bytes() == original.read_bytes()
+    md = "raciocinio_beers_teste.md"
+    assert (copia.parent / md).read_bytes() == (original.parent / md).read_bytes()
 
 
 def test_braco_sem_guia_gera_limpador(tmp_path, roteiro):

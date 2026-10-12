@@ -101,7 +101,11 @@ def reparar(df, coluna, estrategia, parametros, mascara, funcoes=None, dominanci
     escalar = _escalar(estrategia, parametros, funcoes)
     for linha in alvos:
         antes = str(df.at[linha, coluna])
-        depois = escalar(antes)
+        try:
+            depois = escalar(antes)
+        except Exception:
+            # Degradacao nomeada: a celula fica flag. Ver docs/DECISOES.md#funcao-que-lanca.
+            depois = None
         # None e "nao sei reparar"; devolver o mesmo valor nao conta como reparo.
         if depois is not None and depois != antes:
             novo.at[linha, coluna] = depois

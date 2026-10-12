@@ -55,8 +55,14 @@ class Cliente:
     def __init__(self, destino, api):
         destino.mkdir(parents=True, exist_ok=True)
         self.api, self.registro, self.chamadas = api, [], 0
+        # A origem abre o arquivo; o replay a le dele e a regrava igual.
+        self.origem = getattr(api, "origem", None) or {
+            "provedor": config.PROVEDOR, "modelo": config.MODELO,
+            "esforco": config.ESFORCO_RACIOCINIO,
+        }
         self.arquivo = destino / "respostas.jsonl"
-        self.arquivo.write_text("", encoding="utf-8")
+        linha = json.dumps({"origem": self.origem}, ensure_ascii=False)
+        self.arquivo.write_text(linha + "\n", encoding="utf-8")
 
     def anotar(self, etapa, unidade, status, detalhe=""):
         """Acrescenta uma nota ao registro da geracao e a devolve."""
@@ -137,10 +143,13 @@ class _Gravado:
     """Reproduz um respostas.jsonl, na ordem em que cada chamada foi feita."""
 
     def __init__(self, caminho):
-        self.fila = {}
+        self.fila, self.origem = {}, None
         for linha in caminho.read_text(encoding="utf-8").splitlines():
             registro = json.loads(linha)
-            self.fila.setdefault(registro["chave"], []).append(registro["bruto"])
+            if "origem" in registro:
+                self.origem = registro["origem"]
+            else:
+                self.fila.setdefault(registro["chave"], []).append(registro["bruto"])
 
     def responder(self, chave, instrucao, conteudo, esquema):
         """A proxima resposta gravada para esta chamada; ausente levanta, nao degrada."""

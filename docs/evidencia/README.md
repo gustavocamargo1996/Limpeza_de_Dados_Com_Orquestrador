@@ -36,3 +36,16 @@ mantinha a de 0,154 (`conformidade-report.md`).
 
 Os arquivos `.diff` de cada revisão **não** foram preservados: são deriváveis do
 histórico do git com `git diff`.
+
+## Parte 2: os agentes, a espinha e o limpador gerado
+
+Na pasta `parte-2/`, a mesma trilha para a execução do plano
+`docs/superpowers/plans/2026-10-12-parte-2-agentes.md`:
+
+| Arquivo | O que é |
+|---|---|
+| `parte-2/ledger.md` | a varredura do plano antes da execução, as decisões (`Ruling:`) com motivo e custo se errada, os achados menores adiados e os residuais estacionados da revisão final |
+| `parte-2/task-0-report.md` a `parte-2/task-10-report.md` | um por tarefa, com a evidência de TDD e a saída de cada prova por mutação |
+| `parte-2/final-fix-report.md` | a leva de correção da revisão final do branch |
+
+Nenhuma chamada de API foi feita na parte 2: tudo foi testado com um provedor falso.

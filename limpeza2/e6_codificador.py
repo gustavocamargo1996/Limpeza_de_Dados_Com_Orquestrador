@@ -109,13 +109,14 @@ if __name__ == "__main__":
 def escrever(deteccoes, reparos, residual, todas, entrada, destino):
     """Grava o limpador e o raciocinio, roda a fumaca final e devolve o caminho do limpador."""
     destino = Path(destino)
-    registro = provedor.cliente().registro
+    cliente = provedor.cliente()
+    teto = sum(n["status"] == "teto" for n in cliente.registro)
     caminho = destino / f"limpador_{destino.name}.py"
-    texto = _limpador(deteccoes, reparos, residual, entrada, registro, destino.name)
+    texto = _limpador(deteccoes, reparos, residual, entrada, cliente.chamadas, teto, destino.name)
     # newline="" grava o motor com os bytes que ele tem no disco.
     caminho.write_text(texto, encoding="utf-8", newline="")
     (destino / f"raciocinio_{destino.name}.md").write_text(
-        _raciocinio(todas, reparos, residual, entrada, registro, destino.name), encoding="utf-8")
+        _raciocinio(todas, reparos, residual, entrada, cliente, teto, destino.name), encoding="utf-8")
     # Falha aqui e bug do codificador: levanta, perto da causa.
     spec = importlib.util.spec_from_file_location("limpador_gerado", caminho)
     modulo = importlib.util.module_from_spec(spec)
@@ -131,17 +132,17 @@ def renomear(codigo, nome):
     return ast.unparse(arvore)
 
 
-def _limpador(deteccoes, reparos, residual, entrada, registro, nome):
+def _limpador(deteccoes, reparos, residual, entrada, chamadas, teto, nome):
     """O texto do limpador: cabecalho, motor lido do disco, literais e funcoes renomeadas."""
-    teto = sum(n["status"] == "teto" for n in registro)
+    motor = MOTOR.read_text(encoding="utf-8", newline="")
     funcoes = [(r.parametros["funcao"], r.codigo) for r in reparos if r.estrategia == "normalizar"]
     return "\n".join([
-        _cabecalho(entrada, nome),
+        _cabecalho(entrada, chamadas, nome),
         "import argparse",
         "import re",
         "",
         "# o motor traz o proprio import de pandas",
-        f"{INICIO}\n{MOTOR.read_text(encoding='utf-8', newline='')}{FIM}",
+        f"{INICIO}\n{motor}{FIM}",
         "",
         f"GERACAO_TRUNCADA = {teto > 0}",
         f"UNIDADES_DEGRADADAS_POR_TETO = {teto}",
@@ -155,28 +156,27 @@ def _limpador(deteccoes, reparos, residual, entrada, registro, nome):
     ])
 
 
-def _cabecalho(entrada, nome):
+def _cabecalho(entrada, chamadas, nome):
     """A docstring do limpador: origem, modelo, braco, aviso do portao e as memorias congeladas."""
     braco = ("sem guia" if entrada.guia_linhas.empty else
              f"guia de {len(entrada.guia_linhas)} linhas e {len(entrada.guia_pares)} pares")
     return (f'"""Limpador gerado pela POC 2 de limpeza de dados: {nome}.\n\n'
-            f"Modelo {config.MODELO} ({config.PROVEDOR}), {provedor.cliente().chamadas} chamadas; {braco}.\n\n"
+            f"Modelo {config.MODELO} ({config.PROVEDOR}), {chamadas} chamadas; {braco}.\n\n"
             "AVISO: este arquivo roda SEM o portao AST que validou as funcoes corrigir_* na geracao.\n"
             "Revise antes de usar em producao.\n\n"
             "Memoria congelada: RESIDUAL e o dominio de vizinho_no_dominio valem para valores\n"
             'ja vistos na tabela de geracao; nao cobrem valor inedito.\n"""')
 
 
-def _raciocinio(todas, reparos, residual, entrada, registro, nome):
+def _raciocinio(todas, reparos, residual, entrada, cliente, teto, nome):
     """O Markdown com cada regra proposta, aprovada ou nao, e o porque."""
     reparo_de = {id(r.candidata): r for r in reparos}
-    celulas = len(entrada.guia_linhas) * len(entrada.sujo.columns)
-    nao_ok = [n for n in registro if n["status"] != "ok"]
+    nao_ok = [n for n in cliente.registro if n["status"] != "ok"]
     linhas = [f"# Raciocinio do limpador {nome}", "",
               f"- modelo: {config.MODELO} ({config.PROVEDOR}), raciocinio {config.ESFORCO_RACIOCINIO}",
-              f"- supervisao: {celulas} celulas do guia + {len(entrada.guia_pares)} pares",
-              f"- chamadas: {provedor.cliente().chamadas}; tokens: {sum(n['tokens'] for n in registro)}",
-              f"- unidades sem regra pelo teto de chamadas: {sum(n['status'] == 'teto' for n in registro)}"]
+              f"- supervisao: {len(entrada.guia_linhas) * len(entrada.sujo.columns)} celulas do guia + {len(entrada.guia_pares)} pares",
+              f"- chamadas: {cliente.chamadas}; tokens: {sum(n['tokens'] for n in cliente.registro)}",
+              f"- unidades sem regra pelo teto de chamadas: {teto}"]
     for coluna in entrada.sujo.columns:
         linhas += ["", f"## {coluna}"]
         for c in (c for c in todas if c.coluna == coluna):
@@ -189,12 +189,12 @@ def _raciocinio(todas, reparos, residual, entrada, registro, nome):
                 if r.codigo:
                     linhas += ["", "```python", renomear(r.codigo, r.parametros["funcao"]), "```"]
         for res in (r for r in residual if r.coluna == coluna):
-            linhas += ["", "### residual",
-                       *[f"- `{s}` -> `{v}`: {res.justificativas.get(s, '')}" for s, v in sorted(res.mapa.items())],
-                       *[f"- caiu `{s}`: {motivo}" for s, motivo in sorted(res.caidas.items())]]
+            linhas += ["", "### residual"]
+            linhas += [f"- `{s}` -> `{v}`: {res.justificativas.get(s, '')}" for s, v in sorted(res.mapa.items())]
+            linhas += [f"- caiu `{s}`: {motivo}" for s, motivo in sorted(res.caidas.items())]
         linhas += [f"- registro: {n['etapa']} {n['unidade']}: {n['status']} {n['detalhe']}"
                    for n in nao_ok if n["unidade"].split("/")[0] == coluna]
-    linhas += ["", "## Outras anotacoes do registro", "",
-               *[f"- {n['etapa']} {n['unidade']}: {n['status']} {n['detalhe']}"
-                 for n in nao_ok if n["unidade"].split("/")[0] not in entrada.sujo.columns]]
+    linhas += ["", "## Outras anotacoes do registro", ""]
+    linhas += [f"- {n['etapa']} {n['unidade']}: {n['status']} {n['detalhe']}"
+               for n in nao_ok if n["unidade"].split("/")[0] not in entrada.sujo.columns]
     return "\n".join(linhas) + "\n"

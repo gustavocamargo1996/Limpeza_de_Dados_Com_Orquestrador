@@ -63,10 +63,10 @@ def test_estrategia_sem_codigo_passa_sem_chamar_o_llm(roteiro):
     assert api.pedidos == []
 
 
-def gerar(tmp_path, roteiro, nome="beers_teste", codigo=BOM, residual=()):
+def gerar(tmp_path, roteiro, nome="beers_teste", codigo=BOM, residual=(), tabela=None):
     """Escreve um limpador com uma deteccao de dominio reparada por uma funcao."""
     roteiro(lambda instrucao, conteudo: {})
-    entrada = monta_entrada(oncas())
+    entrada = monta_entrada(oncas() if tabela is None else tabela)
     p = proposta(parametros={"transformacao": "tirar ' oz'", "funcao": "corrigir_1"})
     p.codigo = codigo
     destino = tmp_path / nome
@@ -90,14 +90,22 @@ def test_mesma_entrada_mesmo_texto(tmp_path, roteiro):
 
 
 def test_limpador_aplica_regras_e_residual(tmp_path, roteiro):
-    residual = [Residual(coluna="onca", mapa={"16 oz": "16"}, justificativas={"16 oz": "j"})]
-    caminho, entrada = gerar(tmp_path, roteiro, residual=residual)
+    tabela = pd.DataFrame({"onca": ["12", "12 oz", "16oz", "16"]})
+    residual = [Residual(coluna="onca", mapa={"16oz": "16"}, justificativas={"16oz": "j"})]
+    caminho, entrada = gerar(tmp_path, roteiro, residual=residual, tabela=tabela)
     modulo = carregar(caminho)
-    corrigido, flags = modulo.aplicar(entrada.sujo)
-    assert list(corrigido["onca"]) == ["12", "12", "16", "16", "16"]
+    corrigido, flags, fontes = modulo.aplicar_detalhado(entrada.sujo)
+    assert list(corrigido["onca"]) == ["12", "12", "16", "16"]
+    assert list(fontes["onca"]) == ["", "dominio/normalizar", "residual", ""]
     assert not flags.any(axis=None)
     assert modulo.FUNCOES["corrigir_1"]("12 oz") == "12"
     assert modulo.GERACAO_TRUNCADA is False
+
+
+def test_cabecalho_avisa_do_portao_e_da_memoria_congelada(tmp_path, roteiro):
+    caminho, _ = gerar(tmp_path, roteiro)
+    texto = caminho.read_text(encoding="utf-8")
+    assert "SEM o portao AST" in texto and "Memoria congelada" in texto
 
 
 def test_teto_atingido_fica_marcado_no_artefato(tmp_path, roteiro):
@@ -109,6 +117,8 @@ def test_teto_atingido_fica_marcado_no_artefato(tmp_path, roteiro):
     caminho = e6_codificador.escrever([], [], [], [], entrada, destino)
     modulo = carregar(caminho)
     assert (modulo.GERACAO_TRUNCADA, modulo.UNIDADES_DEGRADADAS_POR_TETO) == (True, 1)
+    md = (destino / "raciocinio_beers_teto.md").read_text(encoding="utf-8")
+    assert "unidades sem regra pelo teto de chamadas: 1" in md
 
 
 def test_raciocinio_lista_a_reprovada(tmp_path, roteiro):

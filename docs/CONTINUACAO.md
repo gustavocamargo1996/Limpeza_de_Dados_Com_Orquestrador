@@ -1,5 +1,12 @@
 # Continuação: estado em 12/10/2026
 
+> **Comece por aqui.** Este é o ponto de entrada para quem pega o projeto depois
+> desta sessão. Leia na ordem: este arquivo, `CLAUDE.md` (requisitos),
+> `docs/REGRAS_DO_LIMPADOR.md` (o limpador vigente, explicado) e
+> `docs/DECISOES.md` (as decisões com âncora). A evidência de que a suíte morde
+> está em `docs/evidencia/`, e as 43 decisões tomadas durante a execução estão em
+> `docs/evidencia/ledger-das-decisoes.md`.
+
 Escrito para a próxima sessão, e para mim mesmo depois de a conversa ser
 resumida. Leia junto com o `CLAUDE.md` e o `docs/DECISOES.md`.
 

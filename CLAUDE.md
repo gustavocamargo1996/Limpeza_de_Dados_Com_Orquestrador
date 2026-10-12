@@ -93,16 +93,34 @@ Consequências para o desenho:
 
 ---
 
-## 2. Teto de tamanho: metade da POC 1
+## 2. Teto de tamanho: dois terços da POC 1
 
-Requisito explícito do usuário. A POC 1 tinha **26 arquivos `.py` e 2.810
-linhas** de código de produção (fora `tests/`). Esta POC tem de caber em:
+A POC 1 tinha **26 arquivos `.py` e 2.810 linhas** de código de produção (fora
+`tests/`). Esta POC tem de caber em:
 
-| Medida | Teto |
-|---|---|
-| arquivos `.py` fora de `tests/` | **13**, e **15** no limite, só com necessidade demonstrada |
-| linhas nesses arquivos | **1.400** |
-| maior arquivo | **200 linhas** |
+| Medida | Teto | Fração da POC 1 |
+|---|---|---|
+| arquivos `.py` fora de `tests/` | **16** | 62% |
+| linhas nesses arquivos | **1.800** | 64% |
+| maior arquivo | **200 linhas** | — |
+
+**O requisito original era metade: 13 arquivos e 1.400 linhas.** O usuário o
+elevou em 12/10/2026, com a parte 1 em 911 linhas e a parte 2 projetada em mais
+700. A causa é rastreável e não foi desleixo: a parte 1 foi estimada em cerca de
+700 linhas e entregou 911, e as 211 a mais são o controle negativo por célula, o
+teto informado pelo guia, o veto por valor certificado, a correção do
+determinismo do reparo e a simetria do piso do guia — cada uma aprovada
+separadamente, e cada uma consertando um defeito achado por revisão ou por prova
+por mutação.
+
+**Isto tem de ser declarado ao reportar**, na dissertação inclusive: a POC 2 não
+cumpre o "metade da POC 1" que o usuário pediu no começo. Ela cumpre dois terços,
+e a diferença comprou os cinco mecanismos acima. Omitir isso seria apresentar um
+número que o projeto não alcançou.
+
+**Reserva conhecida:** `limpeza2/__init__.py` está vazio e a suíte passa sem ele
+— verificado em 12/10/2026. Se a parte 2 precisar de um décimo sétimo arquivo,
+essa é a vaga livre, e não um pedido para subir o teto de novo.
 
 **O que o teto de arquivos protege não é a contagem, é a legibilidade.** O risco
 que o usuário quer evitar é se perder na função de cada `.py` por estarem muito
@@ -115,8 +133,7 @@ fracionados. Então valem duas regras, e a segunda manda mais que o número:
   função, nunca pelo tamanho. Um arquivo de 190 linhas com uma função clara é
   melhor que dois de 95 com funções difusas.
 
-Os dois arquivos de folga existem para esse caso, não para acomodar desenho
-novo.
+A folga de arquivos existe para esse caso, não para acomodar desenho novo.
 
 Meça antes de todo commit que acrescenta código:
 

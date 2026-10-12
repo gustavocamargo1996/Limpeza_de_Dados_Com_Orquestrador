@@ -60,9 +60,9 @@ A geração tem sete etapas. As duas primeiras são **determinísticas, sem LLM*
 Depois, numa fase separada que nunca se mistura com a geração, o limpador é
 executado e medido contra o CSV limpo.
 
-**As etapas 3 e de 5 a 7 ainda não existem.** O que está construído e testado são
-as etapas 1, 2 e 4, mais o motor de aplicação de regra, o portão de segurança, o
-sorteio do guia e a medição.
+**Todas as etapas estão implementadas e testadas com um provedor de LLM falso.**
+Nenhum run pago foi feito ainda: os números de qualidade do limpador gerado por
+LLM real não existem.
 
 ---
 

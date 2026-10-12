@@ -220,10 +220,10 @@ inédito.
 ## Uma única implementação da aplicação de regra {#motor-unico}
 
 **Decisão.** `motor.py` é a única implementação. O crivo o importa; o codificador
-copia o texto-fonte dele inteiro para dentro do limpador. O teste que assevera a
-igualdade byte a byte é pendência declarada da parte 2, que escreve o
-codificador; até lá, `tests/test_vazamento.py` só trava os imports do `motor.py`
-em `{"pandas"}`, para o texto copiado não quebrar o limpador entregue.
+copia o texto-fonte dele inteiro para dentro do limpador. A igualdade byte a byte
+é assegurada por `tests/test_e6_codificador.py::test_bloco_embutido_e_motor_byte_a_byte`,
+e `tests/test_vazamento.py` trava os imports do `motor.py` em `{"pandas"}`, para o
+texto copiado não quebrar o limpador entregue.
 
 **Por quê.** Na POC 1 a lógica existia duas vezes, uma na POC e uma cópia
 congelada dentro do limpador, e as duas divergiram. Um run publicou F1 de 100%
@@ -231,7 +231,7 @@ numa coluna em que o limpador entregue marcava zero células. Consertar custou u
 projeto inteiro (lição 8).
 
 **Por que copiar em vez de importar.** O limpador tem de rodar sem depender deste
-repositório. A cópia é mecânica e, na parte 2, será verificada por igualdade, não mantida à
+repositório. A cópia é mecânica e verificada por igualdade (o teste acima), não mantida à
 mão — é isso que a diferencia do defeito da POC 1.
 
 ---
@@ -441,7 +441,8 @@ tenha escrito: é o mesmo piso do par explícito, com o mesmo motivo
 (`perde_par_do_guia`). Só a coluna **determinante** é poupada quando o reparo não
 escreveu nela. Na **detecção** as células sujas do guia não entram no piso: isso
 exigiria marcar todas e rejeitaria regra que pega só um dos tipos de erro da
-coluna. Pendência da parte 2.
+coluna. É decisão, e não pendência: o piso da detecção em `e3_crivo._reprovar`
+cobre só os pares explícitos do guia.
 
 **O preço.** Mudança de comportamento: estratégias como `esvaziar` e
 `vizinho_no_dominio`, que não alcançam o valor exato do par, passam a ser

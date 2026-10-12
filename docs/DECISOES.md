@@ -323,11 +323,16 @@ embora "não alterou" signifique exatamente "continua errado na única célula q
 um humano rotulou". Reproduzido: detecção `dominio` marcando as linhas 4 (XX) e 9
 (YY), par `4, estado, XX → MA`, reparo `{"YY": "MA"}`; resultado aprovado.
 
-**A correção.** Para toda linha de par que esteja na máscara, e cuja coluna seja
-a da candidata (mais os determinantes, quando a estratégia é `moda_condicionada`),
-exige-se `novo == limpo`, sem consultar `reparada`. O filtro por coluna é o que
-impede um par de `onca` de reprovar um reparo de `estado`. Linha de par fora da
-máscara não é verificada: a detecção não a marcou.
+**A correção.** O piso vale sobre as células de que o reparo é responsável. Na
+coluna-alvo da candidata, vale sempre: toda linha de par que esteja na máscara
+exige `novo == limpo`, sem consultar `reparada`. Em coluna determinante (só na
+`moda_condicionada`), vale somente onde o reparo escreveu, isto é, onde
+`novo` difere do sujo naquela célula; ali o valor escrito tem de ser o `limpo`.
+Razão: a exceção do determinante altera a coluna determinante, mas exigir o par
+dela sem condição reprovaria reparo válido por célula que ele nunca toca (par em
+`cidade`, reparo que só conserta `estado`). O filtro por coluna impede ainda que
+um par de `onca` reprove um reparo de `estado`. Linha de par fora da máscara não
+é verificada: a detecção não a marcou.
 
 **O preço.** Mudança de comportamento: estratégias como `esvaziar` e
 `vizinho_no_dominio`, que não alcançam o valor exato do par, passam a ser

@@ -242,3 +242,33 @@ def test_crivar_reparo_reprova_estrategia_que_lanca(sujo):
         raise ValueError("falha de proposito")
     assert crivar_reparo([r], entrada, {"explode": explode}) == []
     assert c.metricas["motivo_reparo"] == "lancou"
+
+
+def test_crivar_reparo_nao_responde_por_determinante_que_nao_escreveu(sujo):
+    # O par esta em cidade, na linha 4 marcada em estado; o reparo conserta so estado.
+    entrada = monta_entrada(sujo, pares=[(4, "cidade", "Boston", "Bostonia")])
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    crivar_deteccao([c], entrada)
+    r = Reparo(
+        candidata=c, estrategia="moda_condicionada",
+        parametros={"determinantes": ["cidade"]}, raciocinio="x",
+    )
+    assert crivar_reparo([r], entrada) == [r]
+    assert c.metricas["motivo_reparo"] == "aprovada"
+
+
+def test_crivar_reparo_responde_por_determinante_que_escreveu_valor_errado():
+    # Bostom aparece uma vez e Boston esta a uma edicao: a excecao reescreve a cidade.
+    sujo = pd.DataFrame({
+        "estado": ["MA", "MA", "MA", "MA", "XX", "MA"],
+        "cidade": ["Boston", "Boston", "Boston", "Boston", "Bostom", "Boston"],
+    })
+    entrada = monta_entrada(sujo, pares=[(4, "cidade", "Bostom", "Outra")])
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    crivar_deteccao([c], entrada)
+    r = Reparo(
+        candidata=c, estrategia="moda_condicionada",
+        parametros={"determinantes": ["cidade"]}, raciocinio="x",
+    )
+    assert crivar_reparo([r], entrada) == []
+    assert c.metricas["motivo_reparo"] == "perde_par_do_guia"

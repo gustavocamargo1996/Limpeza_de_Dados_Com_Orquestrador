@@ -123,6 +123,10 @@ def _reprovar_reparo(entrada, novo, reparada, proposta, mascara):
     for _, par in pares[pares["coluna"].isin(colunas)].iterrows():
         linha = int(par["linha"])
         if linha in novo.index and bool(mascara.get(linha, False)):
-            if novo.at[linha, par["coluna"]] != par["limpo"]:
+            coluna = par["coluna"]
+            # Determinante so responde pela celula que o reparo escreveu.
+            if coluna != proposta.candidata.coluna and novo.at[linha, coluna] == entrada.sujo.at[linha, coluna]:
+                continue
+            if novo.at[linha, coluna] != par["limpo"]:
                 return "perde_par_do_guia"
     return None

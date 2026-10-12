@@ -234,6 +234,9 @@ projeto inteiro (lição 8).
 repositório. A cópia é mecânica e verificada por igualdade (o teste acima), não mantida à
 mão — é isso que a diferencia do defeito da POC 1.
 
+**Ordem de aplicação.** `conformidade` é o primeiro tipo de `TIPOS`: numa célula disputada,
+a regra derivada de dado certificado pelo guia escreve antes da proposta pelo LLM.
+
 ---
 
 ## Medição em dois lugares {#duas-medicoes}

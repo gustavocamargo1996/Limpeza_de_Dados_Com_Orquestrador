@@ -3,7 +3,7 @@ import pandas as pd
 
 NIVEL_SCHEMA = 3
 TIPOS = (
-    "formato", "dominio", "faixa", "ausente_disfarcado", "dependencia", "conformidade"
+    "conformidade", "formato", "dominio", "faixa", "ausente_disfarcado", "dependencia"
 )
 
 

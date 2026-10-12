@@ -11,6 +11,12 @@ def test_ordena_pelo_catalogo_de_tipos():
     assert [r["tipo"] for r in regras_literais([dep, fmt], [])] == ["formato", "dependencia"]
 
 
+def test_conformidade_vem_antes_de_formato():
+    # Ver docs/DECISOES.md#motor-unico: a regra do dado certificado escreve primeiro.
+    fmt, conf = candidata("formato"), candidata("conformidade")
+    assert [r["tipo"] for r in regras_literais([fmt, conf], [])] == ["conformidade", "formato"]
+
+
 def test_reparo_vai_para_a_candidata_pela_identidade():
     # Duas candidatas iguais em tudo: so a segunda ganhou reparo.
     primeira, segunda = candidata("dominio"), candidata("dominio")

@@ -45,6 +45,8 @@ def test_aceita_flag_de_re():
         ('def corrigir(valor):\n    __builtins__.clear()\n    return valor\n', "nome dunder proibido"),
         ('def corrigir(valor):\n    return __import__("os")\n', "__import__"),
         ('def limpar(valor):\n    return valor\n', "corrigir"),
+        ('def corrigir(valor):\n    return corrigir(valor[1:]) if valor else valor\n', "recursao proibida"),
+        ('def corrigir(valor):\n    f = corrigir\n    return valor\n', "recursao proibida"),
         ('def corrigir(v):\n    return v\n', "valor"),
         ('def corrigir(*valor):\n    return valor\n', "so-nomeado"),
         ('def corrigir(valor, *, k=1):\n    return valor\n', "so-nomeado"),

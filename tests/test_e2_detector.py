@@ -76,6 +76,16 @@ def test_variante_malformada_cai_sozinha(roteiro):
     ]
 
 
+def test_faixa_com_limite_infinito_cai(roteiro):
+    roteiro(so_na("estado", [
+        variante("faixa", minimo=float("inf"), maximo=float("inf")),
+        variante("faixa", minimo=float("-inf"), maximo=3),
+        variante("faixa", minimo=1, maximo=3),
+    ]))
+    candidatas = e2_detector.propor(entrada_minima(), [], [])
+    assert [c.parametros for c in candidatas] == [{"minimo": 1, "maximo": 3}]
+
+
 def test_no_maximo_tres_variantes_por_tipo(roteiro):
     roteiro(so_na("estado", [variante("dominio", valores=[v]) for v in ("MA", "TX", "XX", "YY")]))
     candidatas = e2_detector.propor(entrada_minima(), [], [])

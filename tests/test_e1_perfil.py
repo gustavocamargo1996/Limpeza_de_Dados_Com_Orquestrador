@@ -98,3 +98,14 @@ def test_candidatas_sujeito_elegem_a_coluna_que_determina_mais():
             if a != b:
                 pares[(a, b)] = perfilar_par(df, a, b, 0.70)
     assert pares[("id", "nome")]["det"] == pytest.approx(1.0)
+
+
+def test_perfilar_par_mede_cobertura():
+    df = pd.DataFrame({"a": ["x", "x", "y", "y", "z"], "b": ["1", "1", "2", "2", "3"]})
+    p = perfilar_par(df, "a", "b", 0.70)
+    assert p["cobertura"] == pytest.approx(0.8)
+    assert p["n_grupos"] == 2
+
+
+def test_perfilar_coluna_sem_linhas_tem_comprimento_zero():
+    assert perfilar_coluna(pd.Series([], dtype=str))["comprimentos"] == (0, 0)

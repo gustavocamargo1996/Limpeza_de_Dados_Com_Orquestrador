@@ -8,8 +8,6 @@ from limpeza2.tipos import Entrada, Perfil
 
 FREQUENTES = 15
 RAROS = 10
-# Sem o ponto: test_vazamento proibe literal terminado em csv nos modulos.
-FORMATO = "csv"
 
 
 def padrao(valor, nivel=1):
@@ -42,12 +40,12 @@ def perfilar_coluna(serie):
         "frequentes": list(contagem.head(FREQUENTES).items()),
         "raros": list(contagem.tail(RAROS).items()),
         "padroes": list(padroes.head(FREQUENTES).items()),
-        "comprimentos": (int(comprimentos.min()), int(comprimentos.max())),
+        "comprimentos": (int(comprimentos.min()), int(comprimentos.max())) if len(serie) else (0, 0),
     }
 
 
 def perfilar_par(df, determinante, determinado, dominancia):
-    """Os quatro numeros que medem se `determinante` determina `determinado`, so no sujo."""
+    """Os cinco numeros que medem se `determinante` determina `determinado`, so no sujo."""
     n_linhas = n_moda = n_grupos = n_ambiguos = 0
     for _, grupo in df.groupby(determinante, sort=False):
         if len(grupo) < 2:
@@ -59,12 +57,13 @@ def perfilar_par(df, determinante, determinado, dominancia):
         if contagem.iloc[0] / len(grupo) < dominancia:
             n_ambiguos += 1
     if n_grupos == 0:
-        return {"det": 0.0, "n_grupos": 0, "n_divergentes": 0, "frac_ambiguos": 0.0}
+        return {"det": 0.0, "n_grupos": 0, "n_divergentes": 0, "frac_ambiguos": 0.0, "cobertura": 0.0}
     return {
         "det": n_moda / n_linhas,
         "n_grupos": n_grupos,
         "n_divergentes": n_linhas - n_moda,
         "frac_ambiguos": n_ambiguos / n_grupos,
+        "cobertura": n_linhas / len(df),
     }
 
 
@@ -80,7 +79,11 @@ def perfilar(caminho_sujo, caminho_guia):
             if determinante == determinado:
                 continue
             p = perfilar_par(sujo, determinante, determinado, config.DOMINANCIA_MODA)
-            if p["det"] >= config.DET_MINIMO and p["n_grupos"] >= config.GRUPOS_MINIMOS:
+            if (
+                p["det"] >= config.DET_MINIMO
+                and p["cobertura"] >= config.COBERTURA_MINIMA
+                and p["n_grupos"] >= config.GRUPOS_MINIMOS_PAR
+            ):
                 pares[(determinante, determinado)] = p
                 quantos_determina[determinante] += 1
 
@@ -101,8 +104,8 @@ def _ler_guia(caminho_guia, colunas):
     if caminho_guia is None:
         return pd.DataFrame(columns=list(colunas)), vazio_pares
     pasta = Path(caminho_guia)
-    arquivo_linhas = pasta / f"guia_linhas.{FORMATO}"
-    arquivo_pares = pasta / f"guia_pares.{FORMATO}"
+    arquivo_linhas = pasta / "guia_linhas.csv"
+    arquivo_pares = pasta / "guia_pares.csv"
     linhas = pd.DataFrame(columns=list(colunas))
     if arquivo_linhas.exists():
         linhas = pd.read_csv(arquivo_linhas, index_col="_linha", **config.LER_CSV)

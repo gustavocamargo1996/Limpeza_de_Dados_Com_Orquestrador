@@ -6,6 +6,8 @@ import pytest
 
 PACOTE = Path(__file__).resolve().parent.parent / "limpeza2"
 GUARDIOES = {"preparar_guia", "medir"}
+# Unicos literais .csv permitidos, por nome exato: os dois arquivos do guia.
+CSV_PERMITIDOS = {"guia_linhas.csv", "guia_pares.csv"}
 
 
 def modulos():
@@ -39,6 +41,7 @@ def test_nenhum_modulo_cita_arquivo_csv(caminho):
         for no in ast.walk(arvore)
         if isinstance(no, ast.Constant)
         and isinstance(no.value, str)
+        and no.value not in CSV_PERMITIDOS
         and (no.value.lower().endswith(".csv") or no.value in GUARDIOES)
     ]
     assert not literais, (

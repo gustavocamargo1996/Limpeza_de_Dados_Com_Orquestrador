@@ -202,3 +202,11 @@ def test_frequencia_vence_a_ordem_alfabetica():
         verdadeiro_em(df, [5]),
     )
     assert novo.at[5, "cidade"] == "Boston"
+
+
+def test_reparada_so_conta_valor_que_mudou(tabela):
+    # Ver docs/DECISOES.md#reparada-e-mudanca: dicionario {v: v} nao repara nada.
+    m = verdadeiro_em(tabela, [0])
+    novo, reparada = reparar(tabela, "cidade", "dicionario", {"mapa": {"Boston": "Boston"}}, m)
+    assert not reparada.any()
+    assert novo.equals(tabela)

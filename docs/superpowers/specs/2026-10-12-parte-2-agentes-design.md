@@ -40,12 +40,13 @@ def gerar_limpador(caminho_sujo, caminho_guia, destino):
     entrada = e1_perfil.perfilar(caminho_sujo, caminho_guia)
     conformes = conformidade.candidatas_de_conformidade(entrada)
     schema = e3_crivo.crivar_deteccao(conformes, entrada)
-    candidatas = e2_detector.propor(entrada, conformes)
+    candidatas = e2_detector.propor(entrada, schema, conformes)
     deteccoes = e3_crivo.crivar_deteccao(schema + candidatas, entrada)
     propostas = e4_especificador.especificar(deteccoes, entrada)
-    funcoes = e6_codificador.codificar(propostas, entrada)
-    reparos = e3_crivo.crivar_reparo(propostas, entrada, funcoes)
-    residual = e5_residual.resolver(deteccoes, reparos, funcoes, entrada)
+    codificadas, funcoes = e6_codificador.codificar(propostas, entrada)
+    reparos = e3_crivo.crivar_reparo(codificadas, entrada, funcoes)
+    sugestoes = e5_residual.resolver(deteccoes, reparos, funcoes, entrada)
+    residual = e3_crivo.crivar_residual(sugestoes, entrada)
     return e6_codificador.escrever(
         deteccoes, reparos, residual, conformes + candidatas, entrada, destino
     )
@@ -63,9 +64,19 @@ O que mudou em relação à espinha da spec de 11/10, e por quê:
   `taxa` e `teto` saem idênticos, e só a `taxa_uniao` muda, de propósito. Um teste
   trava isso, porque é a suposição que sustenta chamar o crivo duas vezes sobre
   os mesmos objetos.
+- **O detector recebe `schema` e `conformes`.** O catálogo da coluna sai de
+  `schema`, a lista que o crivo **devolveu**; `conformes` só alimenta a frase do
+  prompt (aprovada, reprovada com motivo, vácua). A decisão estrutural não lê
+  efeito de mutação.
 - **O codificador age em dois tempos.** `crivar_reparo` precisa das funções
   `corrigir` para testar a estratégia `normalizar`, então `codificar` roda antes
   dele, e `escrever` roda no fim. Ele aparece duas vezes na espinha, como o crivo.
+  `codificar` devolve `(codificadas, funcoes)`: a proposta `normalizar` cujo
+  código o portão rejeitou duas vezes não chega ao crivo (lá ela cairia como
+  `lancou` por `KeyError`, com o motivo errado), e o motivo `codigo_rejeitado`
+  vai às `metricas` da candidata, para o `.md`.
+- **`crivar_residual` está na espinha**, não dentro do `e5`: nenhuma passagem do
+  crivo fica escondida fora da sequência.
 - **`escrever` recebe valores com nomes distintos, nunca efeito de mutação.**
   `deteccoes` é o que o limpador aplica e de onde saem as flags, inclusive das
   detecções sem reparo. `conformes + candidatas` alimenta só o `.md`, para mostrar
@@ -129,7 +140,9 @@ não é regressão; mudança no limpador congelado ou na geração a partir das
 respostas gravadas é.
 
 **Registro.** O cliente anota cada chamada: etapa, unidade, status ou motivo da
-falha, e tokens. É desse registro que saem a contagem de chamadas, a marca de
+falha, e tokens. `anotar(etapa, unidade, status, detalhe)` deixa uma etapa
+registrar o que não é chamada: a coluna-sujeito escolhida e os lotes não
+enviados (`sem_lote`). É desse registro que saem a contagem de chamadas, a marca de
 truncamento e as falhas por unidade no `.md`. Nenhuma lista de falhas viaja pela
 espinha.
 
@@ -155,7 +168,7 @@ desenho não muda: a conversão de cada agente já valida campo a campo e descar
 o que vier malformado, então ela é o validador nos dois modos. O objeto plano com
 nulos (§3.2) foi escolhido para servir aos dois.
 
-### 3.2 Detector (`e2_detector.propor(entrada, conformes)`)
+### 3.2 Detector (`e2_detector.propor(entrada, schema, conformes)`)
 
 Uma chamada por coluna, em todas as colunas.
 
@@ -212,7 +225,7 @@ não marcados da coluna com duas ou mais ocorrências, mais os valores
 certificados. Pedir a lista ao LLM traria de volta o estouro de saída. Ele entra
 no limpador como literal, e por isso é **memória** (§6).
 
-### 3.4 Codificador, primeiro tempo (`e6_codificador.codificar(propostas, entrada)`)
+### 3.4 Codificador, primeiro tempo (`e6_codificador.codificar(propostas, entrada) -> (codificadas, funcoes)`)
 
 Uma chamada por proposta `normalizar`. **O prompt leva** a `transformacao`, os
 exemplos `sujo -> limpo` do guia na coluna, uma amostra dos valores marcados e o
@@ -261,7 +274,14 @@ invólucros finos sobre `aplicar_regras` no limpador.
 escalar diferente, cujo contrato é "devolve o valor novo, ou `None` para não
 reparar" — isso cobre o valor fora do mapa, o vizinho distante e a célula já
 vazia, que são os três ramos que hoje decidem se `reparada` vira verdadeiro. A
-simplificação não muda comportamento, e a suíte atual é a guarda.
+suíte atual é a guarda.
+
+**Uma mudança de comportamento, de propósito e num caso de borda:** `reparada`
+passa a significar "o valor mudou" em todas as estratégias, como já era em
+`normalizar` e `esvaziar`. Hoje `dicionario` com `{v: v}` e `vizinho_no_dominio`
+que devolve o próprio valor contam como reparo sem mudar nada, e isso deixaria
+passar no `nao_repara` uma regra que não repara. Um teste trava o caso, e o
+`DECISOES.md` registra.
 
 A conversão de `deteccoes + reparos` para a lista literal de regras é usada pelo
 `e5` e pelo `e6.escrever`, e mora em `tipos.py` como `regras_literais(...)`. A
@@ -292,7 +312,8 @@ Devolve `list[Residual]`.
 5. **Consolidação.** `null` e `limpo == sujo` não entram. O mesmo `(coluna, sujo)`
    com a mesma resposta em lotes diferentes vira **uma** entrada; com respostas
    diferentes, sai como `conflitante`.
-6. **Crivo, por entrada** (`e3_crivo.crivar_residual`). Cai a entrada que escreve
+6. **Crivo, por entrada** (`e3_crivo.crivar_residual`, chamado pela espinha). A
+   entrada que cai sai de `mapa` e vai para `Residual.caidas`, com o motivo. Cai a entrada que escreve
    em célula do guia um valor diferente do guia, que contradiz um par do guia, ou
    cujo `sujo` é valor que o guia certifica como correto na coluna.
 7. **No limpador**, o dicionário age só em célula marcada e não reparada.
@@ -469,16 +490,16 @@ altere o artefato.
 
 | | Linhas (estimativa) |
 |---|---|
-| `provedor.py` | ~70 |
-| `e2_detector.py` | ~140 |
-| `e4_especificador.py` | ~120 |
-| `e5_residual.py` | ~150 |
-| `e6_codificador.py` | ~195 |
-| `espinha.py` (com CLI) | ~45 |
-| `motor.py` | 183 → ~198 (−15 da simplificação, +30 de `aplicar_regras`) |
-| `e3_crivo.py` | 175 → ~190 (`crivar_residual` entra, a conta `sujo != guia` repetida três vezes se consolida) |
-| `tipos.py`, `config.py`, `medir.py` | +28 |
-| **total** | **~1.720 de 1.800** |
+| `provedor.py` | ~150 (medido no código do plano; a estimativa do brainstorming era ~70) |
+| `e2_detector.py` | ~130 |
+| `e4_especificador.py` | ~115 |
+| `e5_residual.py` | ~120 |
+| `e6_codificador.py` | ~190 |
+| `espinha.py` (com CLI) | ~40 |
+| `motor.py` | 183 → ~192 (−14 da simplificação, +23 de `aplicar_regras`) |
+| `e3_crivo.py` | 175 → ~195 (`crivar_residual` entra; a conta `sujo != guia` sai para `limites.guia_na_coluna`) |
+| `limites.py`, `tipos.py`, `config.py`, `medir.py` | +48 |
+| **total** | **~1.760 de 1.800** |
 
 16 arquivos de 16. `motor`, `e3_crivo` e `e6` fecham perto de 200: é o ponto mais
 apertado do plano, medido antes de cada commit (`CLAUDE.md` §2).

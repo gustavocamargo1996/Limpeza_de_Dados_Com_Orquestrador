@@ -1471,11 +1471,19 @@ Expected: PASS, 14 testes.
 
 Mutação A: no `_reparar_por_moda`, remover o laço do determinante (o primeiro `for det in determinantes`). `test_corrige_o_determinante_quando_ele_e_o_erro_de_digitacao` tem de FALHAR. Reverter.
 
-Mutação B: trocar `if contagem.iloc[0] / len(grupo) < dominancia: continue` por `pass`. `test_moda_condicionada_nao_repara_grupo_ambiguo` tem de FALHAR. Reverter.
+Mutação B: em `moda_dominante`, trocar o `return None` do grupo sem maioria clara por `pass`. `test_moda_condicionada_nao_repara_grupo_ambiguo` tem de FALHAR. Reverter. A mutação mora em `moda_dominante`, e não em `_reparar_por_moda`, porque a conta da moda foi extraída na tarefa 5 — é a mesma função que a detecção usa.
 
 Mutação C: trocar `novo = df.copy()` por `novo = df`. `test_reparar_nao_altera_o_dataframe_recebido` tem de FALHAR. Reverter.
 
-Mutação D: trocar `return melhor if menor <= distancia_maxima else None` por `return melhor`. `test_vizinho_no_dominio_desiste_quando_esta_longe` tem de FALHAR. Reverter.
+Mutação D: em `_mais_proximo`, trocar `menor = distancia_maxima + 1` por `menor = float("inf")`. `test_vizinho_no_dominio_desiste_quando_esta_longe` tem de FALHAR, porque `N/A` passaria a virar `Tropical`. Reverter.
+
+A primeira versão deste plano mandava uma mutação diferente aqui — trocar `return melhor if menor <= distancia_maxima else None` por `return melhor` — e ela **não morde**: é mutante equivalente. `melhor` só deixa de ser `None` dentro de `if d < menor`, e `menor` começa em `distancia_maxima + 1`, logo `melhor is not None` já implica `menor <= distancia_maxima`. A guarda era código morto que sugeria uma proteção inexistente, e saiu do código: quem faz a função desistir é o **valor inicial** de `menor`. Foi a quarta previsão de mutação errada deste plano, e a quarta pega por implementador que se recusou a ajustar o código.
+
+Mutação F: trocar `menor = distancia_maxima + 1` por `menor = distancia_maxima`. O teste de limite inclusivo — um vizinho a distância **exatamente igual** ao máximo, que ainda deve ser aceito — tem de FALHAR. Reverter.
+
+Mutação G: trocar `n == 1` por `n >= 1` na construção de `raros`, dentro de `_reparar_por_moda`. O teste negativo do determinante tem de FALHAR. Reverter. Mutação H: trocar `n >= 2` por `n >= 1` na construção de `comuns`. O mesmo teste tem de FALHAR.
+
+As mutações G e H protegem a salvaguarda mais importante do reparo: ela é o que distingue "valor raro, provável erro de digitação" de "valor legítimo e frequente". Com `Austin` e `Austen` duas vezes cada, nenhum é raro e nenhum é corrigido para o outro. Afrouxar isso faria a POC corromper chave válida, que é o oposto da precisão que ela existe para preservar. **O teste negativo exige um par a exatamente uma edição de distância**: na primeira tentativa a dupla escolhida distava duas, e a mutação não morreu.
 
 Mutação E: remover o bloco `if i > 1 and j > 1 and ca == b[j - 2] and a[i - 2] == cb` de `distancia_edicao`. O caso `("Boston", "Bosotn", 1)` tem de FALHAR, passando a devolver 2. Reverter.
 

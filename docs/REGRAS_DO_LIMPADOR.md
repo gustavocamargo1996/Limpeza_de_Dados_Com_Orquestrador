@@ -199,6 +199,31 @@ lugar entre dois caracteres vizinhos**. Essa última é a mais comum de todas, e
 contá-la como uma edição só é o que faz `Bosotn` ser reconhecido como `Boston` —
 pela conta tradicional ele estaria a duas edições e passaria batido.
 
+#### Duas salvaguardas, e por que cada uma existe
+
+**A primeira protege a chave legítima.** O valor errado tem de aparecer **uma
+única vez** na coluna, e o vizinho tem de aparecer **duas ou mais**. Se `Austin`
+e `Austen` aparecem duas vezes cada, nenhum dos dois é raro, e nenhum é corrigido
+para o outro — porque não há como saber qual é o certo. Sem essa condição, o
+limpador passaria a reescrever valores válidos e frequentes, que é o oposto do
+que ele promete.
+
+**A segunda garante que o resultado não mude entre execuções.** Um valor raro
+pode estar a uma edição de **mais de um** vizinho comum. `Bostn` está a uma
+edição de `Boston` e de `Bostan`. A regra de desempate é:
+
+> entre os vizinhos a uma edição, vence **o mais frequente**; em empate de
+> frequência, vence **o primeiro em ordem alfabética**.
+
+Então com `Boston` três vezes e `Bostan` duas, sai `Boston`, pela frequência.
+Com os dois aparecendo duas vezes, sai `Bostan`, porque `a` vem antes de `o`.
+
+Essa regra parece detalhe e não é. Sem uma ordem total explícita, o desempate
+acabaria decidido pela ordem interna de uma estrutura de dados, que em Python
+muda a cada execução do programa — e a mesma tabela seria limpa de dois jeitos
+em dias diferentes. Para um limpador cujo propósito é ser reexecutável e
+auditável, isso é defeito grave, e passou perto de acontecer.
+
 ---
 
 ## 5. O crivo: por que a maioria das regras propostas é reprovada

@@ -42,6 +42,7 @@ def test_aceita_flag_de_re():
         ('def corrigir(valor):\n    re.sub = len\n    return valor\n', "escrita de atributo proibida"),
         ('def corrigir(valor):\n    del re.sub\n    return valor\n', "escrita de atributo proibida"),
         ('def corrigir(valor):\n    return valor.__class__\n', "dunder"),
+        ('def corrigir(valor):\n    __builtins__.clear()\n    return valor\n', "nome dunder proibido"),
         ('def corrigir(valor):\n    return __import__("os")\n', "__import__"),
         ('def limpar(valor):\n    return valor\n', "corrigir"),
         ('def corrigir(v):\n    return v\n', "valor"),
@@ -98,3 +99,9 @@ def test_fumaca_pega_falha_em_runtime():
 
 def test_fumaca_passa_com_funcao_sadia():
     testar_fumaca(materializar(VALIDA), ["ab", "", "  X  "])
+
+@pytest.mark.parametrize("corpo", ["yield valor", "return None", "return [valor]"])
+def test_fumaca_rejeita_o_que_nao_devolve_str(corpo):
+    funcao = materializar(f"def corrigir(valor):\n    {corpo}\n")
+    with pytest.raises(CodigoRejeitado, match="deve devolver str"):
+        testar_fumaca(funcao, ["ab"])

@@ -145,8 +145,10 @@ medição acontece em dois lugares e o recall é decomposto por fonte.
 ## Uma única implementação da aplicação de regra {#motor-unico}
 
 **Decisão.** `motor.py` é a única implementação. O crivo o importa; o codificador
-copia o texto-fonte dele inteiro para dentro do limpador. Um teste assevera a
-igualdade byte a byte.
+copia o texto-fonte dele inteiro para dentro do limpador. O teste que assevera a
+igualdade byte a byte é pendência declarada da parte 2, que escreve o
+codificador; até lá, `tests/test_vazamento.py` só trava os imports do `motor.py`
+em `{"pandas"}`, para o texto copiado não quebrar o limpador entregue.
 
 **Por quê.** Na POC 1 a lógica existia duas vezes, uma na POC e uma cópia
 congelada dentro do limpador, e as duas divergiram. Um run publicou F1 de 100%
@@ -154,8 +156,8 @@ numa coluna em que o limpador entregue marcava zero células. Consertar custou u
 projeto inteiro (lição 8).
 
 **Por que copiar em vez de importar.** O limpador tem de rodar sem depender deste
-repositório. A cópia é mecânica e verificada por igualdade, não mantida à mão —
-é isso que a diferencia do defeito da POC 1.
+repositório. A cópia é mecânica e, na parte 2, será verificada por igualdade, não mantida à
+mão — é isso que a diferencia do defeito da POC 1.
 
 ---
 
@@ -169,6 +171,13 @@ fonte.
 se mede. Não é vazamento de gabarito — o LLM nunca vê a resposta certa — mas é
 ajustar o artefato à tabela em que ele é avaliado. Com um número só, memorização
 e capacidade ficariam somadas e indistinguíveis.
+
+**Limitação conhecida da precisão publicada.** A fórmula é a da POC 1, de
+propósito. Coluna sem nenhum erro é "não mensurável" e fica fora do total, então
+um limpador que estraga uma coluna perfeitamente limpa recebe precisão 1,0 nessa
+coluna. `flags` é o único lugar onde isso aparece. Nenhuma fixture está nesse
+estado hoje; um teste (`..._limitacao_conhecida`) trava o comportamento. Mudar a
+fórmula moveria números ancorados e é decisão do usuário.
 
 **Viabilidade verificada.** As 300 linhas do `environment` são 300 das 1.000 do
 arquivo completo, e as do `beers` são 300 das 2.410. No `beers`, duas colunas
@@ -194,8 +203,9 @@ invariante verificável por import, em vez de uma convenção que depende de
 disciplina. O teste de vazamento fica trivial: nenhum módulo de `limpeza2/`
 importa nenhum dos dois.
 
-**Sobre o sorteio.** Decisão do usuário: 20 linhas sorteadas entre as que estão
-100% corretas, e até 2 pares `sujo → limpo` por coluna que tem erro. A cota por
+**Sobre o sorteio.** Decisão do usuário: até 20 linhas sorteadas entre as que
+estão 100% corretas (20 é teto: medido, o `beers` tem **5** linhas 100% limpas
+em 300, e o guia dele ficou com exatamente essas cinco), e até 2 pares `sujo → limpo` por coluna que tem erro. A cota por
 coluna imita o humano varrendo coluna a coluna e garante exemplo onde o sorteio
 puro não chegaria. Gerado uma vez, commitado, igual entre runs.
 
@@ -288,11 +298,40 @@ Os atributos não-dunder de `Pattern`, de `Match` e dos tipos nativos da allowli
 foram sondados e não levam a lugar nenhum. Isso é evidência, não demonstração: a
 superfície de um sandbox em processo nunca é provada segura por teste.
 
+**Limite conhecido: sem limite de tempo nem de memória.** `while True: pass`,
+recursão profunda e regex com backtracking catastrófico passam no portão e travam
+a geração. A POC 1 também não tinha. O modelo de ameaça aqui é LLM desastrado,
+não adversário, então é limite declarado, não defeito.
+
+**`corrigir` tem de devolver `str`.** `testar_fumaca` rejeita gerador, `None` e
+lista: a POC 1 checava isso no modo série e a checagem se perdeu ao não portar
+aquele modo. Sem ela, o `repr` de um gerador chegaria à célula.
+
 `re` chega ao namespace como proxy e `pd` fica fora — o que casa com a decisão de
 o LLM escrever só funções escalares.
 
 **O limpador gerado roda sem o portão** na máquina do usuário. O cabeçalho dele
 avisa isso.
+
+---
+
+## O par do guia exige o valor exato {#par-exige-valor-exato}
+
+**O furo.** `_reprovar_reparo` só verificava o par do guia quando o reparo havia
+alterado a célula (`reparada` verdadeiro). Reparo que não tocava o par passava,
+embora "não alterou" signifique exatamente "continua errado na única célula que
+um humano rotulou". Reproduzido: detecção `dominio` marcando as linhas 4 (XX) e 9
+(YY), par `4, estado, XX → MA`, reparo `{"YY": "MA"}`; resultado aprovado.
+
+**A correção.** Para toda linha de par que esteja na máscara, e cuja coluna seja
+a da candidata (mais os determinantes, quando a estratégia é `moda_condicionada`),
+exige-se `novo == limpo`, sem consultar `reparada`. O filtro por coluna é o que
+impede um par de `onca` de reprovar um reparo de `estado`. Linha de par fora da
+máscara não é verificada: a detecção não a marcou.
+
+**O preço.** Mudança de comportamento: estratégias como `esvaziar` e
+`vizinho_no_dominio`, que não alcançam o valor exato do par, passam a ser
+reprovadas. Troca deliberada de precisão a mais por recall a menos.
 
 ---
 

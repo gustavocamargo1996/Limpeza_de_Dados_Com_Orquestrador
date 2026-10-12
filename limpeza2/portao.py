@@ -22,7 +22,7 @@ _BUILTINS_PERMITIDOS = {
     "str": str, "sum": sum, "tuple": tuple, "zip": zip,
     "isinstance": isinstance, "ValueError": ValueError, "TypeError": TypeError,
     "AttributeError": AttributeError, "IndexError": IndexError,
-    "KeyError": KeyError, "Exception": Exception, "None": None,
+    "KeyError": KeyError, "Exception": Exception,
 }
 
 # O modulo re inteiro vazaria sys e functools por re.enum.sys; so este recorte entra.
@@ -77,6 +77,8 @@ def validar(codigo, nome_funcao=NOME_FUNCAO, nome_argumento=NOME_ARGUMENTO):
             raise CodigoRejeitado(f"escrita de atributo proibida: .{no.attr}")
         if isinstance(no, ast.Attribute) and no.attr.startswith("__"):
             raise CodigoRejeitado(f"acesso a atributo dunder proibido: {no.attr}")
+        if isinstance(no, ast.Name) and no.id.startswith("__"):
+            raise CodigoRejeitado(f"nome dunder proibido: {no.id}")
 
 
 def materializar(codigo, nome_funcao=NOME_FUNCAO, nome_argumento=NOME_ARGUMENTO):
@@ -97,9 +99,13 @@ def testar_fumaca(funcao, amostras):
     """Chama a funcao com valores reais e rejeita a que falhar em runtime."""
     for amostra in amostras:
         try:
-            funcao(amostra)
+            devolvido = funcao(amostra)
         except Exception as erro:
             raise CodigoRejeitado(
                 f"a funcao lancou {type(erro).__name__} com \"{amostra}\": {erro}. "
                 "Atencao a regex mal formada: flag inline como (?i) so vale no inicio."
             ) from erro
+        if not isinstance(devolvido, str):
+            raise CodigoRejeitado(
+                f"a funcao devolveu {type(devolvido).__name__} com \"{amostra}\": deve devolver str"
+            )

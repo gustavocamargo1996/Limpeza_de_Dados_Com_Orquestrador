@@ -39,9 +39,7 @@ def linhas_do_guia(caminho_linhas, caminho_pares):
     if Path(caminho_linhas).exists():
         fora |= set(pd.read_csv(caminho_linhas, index_col="_linha").index)
     if Path(caminho_pares).exists():
-        pares = pd.read_csv(caminho_pares)
-        if not pares.empty:
-            fora |= set(pares["linha"])
+        fora |= set(pd.read_csv(caminho_pares)["linha"])
     return fora
 
 
@@ -60,7 +58,8 @@ def avaliar(caminho_limpador, caminho_sujo, caminho_limpo, holdout=None):
             corrigido, flags = modulo.aplicar(sujo)
             fontes = None
 
-    manter = sujo.index.difference(pd.Index(sorted(holdout or [])))
+    manter_fora = sujo.index.intersection(pd.Index(sorted(holdout or [])))
+    manter = sujo.index.difference(manter_fora)
     colunas, por_fonte = {}, {}
     tp = n_erro = n_mud = n_flag = 0
     for coluna in sujo.columns:
@@ -90,7 +89,7 @@ def avaliar(caminho_limpador, caminho_sujo, caminho_limpo, holdout=None):
     f1 = 2 * p * r / (p + r) if (p and (p + r)) else 0.0
     return {
         "colunas": colunas,
-        "holdout": len(holdout or []),
+        "holdout": len(manter_fora),
         "fontes": por_fonte,
         "total": {"erros": n_erro, "mudancas": n_mud, "tp": tp, "flags": n_flag,
                   "precisao": p, "recall": r, "f1": f1},

@@ -123,6 +123,30 @@ def test_holdout_respeitado_em_totais_e_fontes(minimo):
     assert r["fontes"] == {"regra1": 1}
 
 
+def test_holdout_publicado_conta_so_indice_existente(minimo):
+    r = avaliar(*minimo, holdout={0, 1, 9999, 10000})
+    assert r["holdout"] == 2
+
+
+def test_precisao_ignora_falso_positivo_em_coluna_sem_erro_limitacao_conhecida(tmp_path):
+    # Limitacao conhecida, nao comportamento desejado: a coluna sem erro nao e mensuravel.
+    linhas = [
+        "def aplicar(df):",
+        "    out = df.copy()",
+        "    out.loc[0, 'b'] = 'estragado'",
+        "    out.loc[1, 'a'] = 'ok'",
+        "    return out, df.astype(bool) & False",
+    ]
+    (tmp_path / "l.py").write_text(chr(10).join(linhas), encoding="utf-8")
+    pd.DataFrame({"a": ["x", "errado"], "b": ["p", "q"]}).to_csv(tmp_path / "s.csv", index=False)
+    pd.DataFrame({"a": ["x", "ok"], "b": ["p", "q"]}).to_csv(tmp_path / "c.csv", index=False)
+    r = avaliar(tmp_path / "l.py", tmp_path / "s.csv", tmp_path / "c.csv")
+    assert r["colunas"]["b"]["mensuravel"] is False
+    assert r["colunas"]["b"]["mudancas"] == 1
+    assert r["total"]["mudancas"] == 1
+    assert r["total"]["precisao"] == 1.0
+
+
 def _ints(conjunto):
     return all(isinstance(x, numbers.Integral) for x in conjunto)
 

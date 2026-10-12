@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 RAIZ = Path(__file__).resolve().parent.parent
-DATASETS = Path(r"C:\Users\gusta\projects\Limpeza_de_Dados\ZeroDC\datasets")
 GUIA = RAIZ / "dados" / "guia"
 SAIDA = RAIZ / "saida"
 

@@ -158,7 +158,7 @@ Minerar primeiro, deixar o LLM julgar depois — nunca o contrário. Pedir
 dependências ao LLM só pelos nomes das colunas produz plausibilidade sem
 suporte nos dados; minerar sem o LLM produz coincidências estatísticas.
 
-Para cada par ordenado de colunas, a etapa 1 calcula quatro números **só na
+Para cada par ordenado de colunas, a etapa 1 calcula cinco números **só na
 tabela suja**:
 
 | Número | O que significa |

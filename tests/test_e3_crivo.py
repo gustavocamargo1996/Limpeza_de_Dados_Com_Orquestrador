@@ -155,7 +155,10 @@ def test_crivar_reparo_guarda_contra_reparo_fora_da_mascara(sujo):
     novo.at[0, "estado"] = "ZZ"
     reparada = pd.Series(False, index=novo.index)
     reparada.loc[4] = True
-    assert _reprovar_reparo(entrada, novo, reparada) == "toca_linha_limpa"
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    r = Reparo(candidata=c, estrategia="dicionario", parametros={}, raciocinio="x")
+    mascara = pd.Series(False, index=novo.index)
+    assert _reprovar_reparo(entrada, novo, reparada, r, mascara) == "toca_linha_limpa"
 
 
 def test_crivar_reparo_aprova_quem_repara_e_respeita_o_guia(sujo):
@@ -198,6 +201,33 @@ def test_crivar_reparo_reprova_quem_repara_o_par_para_o_valor_errado(sujo):
     assert crivar_reparo([r], entrada) == []
     assert c.metricas["reparadas"] == 1
     assert c.metricas["motivo_reparo"] == "perde_par_do_guia"
+
+
+def test_crivar_reparo_reprova_quem_deixa_o_par_intacto(sujo):
+    # Acerta a linha 9 e nao toca a 4, que e o par: nao alterar e continuar errado.
+    entrada = monta_entrada(sujo, pares=[(4, "estado", "XX", "MA")])
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    crivar_deteccao([c], entrada)
+    r = Reparo(
+        candidata=c, estrategia="dicionario", parametros={"mapa": {"YY": "MA"}},
+        raciocinio="x",
+    )
+    assert crivar_reparo([r], entrada) == []
+    assert c.metricas["reparadas"] == 1
+    assert c.metricas["motivo_reparo"] == "perde_par_do_guia"
+
+
+def test_crivar_reparo_ignora_par_de_outra_coluna(sujo):
+    # O par de cidade cai numa linha marcada em estado e o limpo dele nunca sai do reparo.
+    entrada = monta_entrada(sujo, pares=[(4, "cidade", "Bostom", "Outra")])
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    r = Reparo(
+        candidata=c, estrategia="dicionario",
+        parametros={"mapa": {"XX": "MA", "YY": "MA"}}, raciocinio="x",
+    )
+    assert crivar_deteccao([c], entrada) == [c]
+    assert crivar_reparo([r], entrada) == [r]
+    assert c.metricas["motivo_reparo"] == "aprovada"
 
 
 def test_crivar_reparo_reprova_estrategia_que_lanca(sujo):

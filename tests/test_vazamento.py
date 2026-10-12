@@ -8,6 +8,8 @@ PACOTE = Path(__file__).resolve().parent.parent / "limpeza2"
 GUARDIOES = {"preparar_guia", "medir"}
 # Unicos literais .csv permitidos, por nome exato: os dois arquivos do guia.
 CSV_PERMITIDOS = {"guia_linhas.csv", "guia_pares.csv"}
+# O motor e copiado para dentro do limpador gerado, que roda sem este repositorio.
+IMPORTS_PERMITIDOS_NO_MOTOR = {"pandas"}
 
 
 def modulos():
@@ -46,4 +48,18 @@ def test_nenhum_modulo_cita_arquivo_csv(caminho):
     ]
     assert not literais, (
         f"{caminho.name} tem literal proibido em {literais}: CSV vem por argumento e guardiao nao se cita por nome"
+    )
+
+
+def test_motor_importa_so_o_permitido():
+    arvore = ast.parse((PACOTE / "motor.py").read_text(encoding="utf-8"))
+    importados = set()
+    for no in ast.walk(arvore):
+        if isinstance(no, ast.Import):
+            importados.update(alias.name.split(".")[0] for alias in no.names)
+        elif isinstance(no, ast.ImportFrom):
+            importados.add(f"{'.' * no.level}{no.module or ''}".split(".")[0] or "<relativo>")
+    assert importados, "motor sem import algum: o teste nao estaria testando nada"
+    assert importados <= IMPORTS_PERMITIDOS_NO_MOTOR, (
+        f"motor.py importa {importados - IMPORTS_PERMITIDOS_NO_MOTOR}: o limpador gerado quebraria"
     )

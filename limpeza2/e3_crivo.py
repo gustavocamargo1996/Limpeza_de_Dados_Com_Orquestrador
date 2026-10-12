@@ -97,7 +97,7 @@ def crivar_reparo(propostas, entrada, funcoes=None):
             candidata.metricas["detalhe_reparo"] = f"{type(erro).__name__}: {erro}"
             continue
 
-        motivo = _reprovar_reparo(entrada, novo, reparada)
+        motivo = _reprovar_reparo(entrada, novo, reparada, proposta, mascara)
         candidata.metricas["reparadas"] = int(reparada.sum())
         candidata.metricas["motivo_reparo"] = motivo or "aprovada"
         if motivo is None:
@@ -105,7 +105,7 @@ def crivar_reparo(propostas, entrada, funcoes=None):
     return aprovados
 
 
-def _reprovar_reparo(entrada, novo, reparada):
+def _reprovar_reparo(entrada, novo, reparada, proposta, mascara):
     """O motivo da reprovacao do reparo, ou None se ele passar."""
     linhas_limpas = entrada.guia_linhas.index.intersection(entrada.sujo.index)
     if len(linhas_limpas):
@@ -115,11 +115,14 @@ def _reprovar_reparo(entrada, novo, reparada):
             return "toca_linha_limpa"
     if int(reparada.sum()) == 0:
         return "nao_repara"
+    # Ver docs/DECISOES.md#par-exige-valor-exato: nao consulta `reparada`.
+    colunas = {proposta.candidata.coluna}
+    if proposta.estrategia == "moda_condicionada":
+        colunas |= set(proposta.parametros["determinantes"])
     pares = entrada.guia_pares
-    if not pares.empty:
-        for _, par in pares.iterrows():
-            linha = int(par["linha"])
-            if linha in novo.index and par["coluna"] in novo.columns:
-                if reparada.get(linha, False) and novo.at[linha, par["coluna"]] != par["limpo"]:
-                    return "perde_par_do_guia"
+    for _, par in pares[pares["coluna"].isin(colunas)].iterrows():
+        linha = int(par["linha"])
+        if linha in novo.index and bool(mascara.get(linha, False)):
+            if novo.at[linha, par["coluna"]] != par["limpo"]:
+                return "perde_par_do_guia"
     return None

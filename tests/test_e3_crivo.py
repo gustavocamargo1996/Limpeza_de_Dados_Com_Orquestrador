@@ -103,7 +103,7 @@ def test_reprova_dependencia_ambigua():
 
 def test_reprova_regra_que_lanca(sujo):
     entrada = monta_entrada(sujo)
-    c = candidata("formato", {"regex": "[["})
+    c = candidata("formato", {"regex": "("})
     assert crivar_deteccao([c], entrada) == []
     assert c.metricas["motivo"] == "lancou"
 

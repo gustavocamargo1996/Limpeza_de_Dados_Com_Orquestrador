@@ -5,3 +5,4 @@ __pycache__/
 limpador_*.py
 raciocinio_*.md
 !tests/fixtures/limpador_*.py
+.superpowers/

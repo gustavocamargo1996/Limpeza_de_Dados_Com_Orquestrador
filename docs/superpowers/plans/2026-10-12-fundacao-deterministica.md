@@ -76,7 +76,12 @@ Criar `pyproject.toml`:
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+pythonpath = ["."]
 ```
+
+`pythonpath = ["."]` não é opcional: sem ele, o modo de import padrão do pytest insere `tests/` no `sys.path` e nenhum `from limpeza2...`, `from preparar_guia...` ou `from medir...` resolve. Exige pytest ≥ 7, e o `requirements.txt` pede ≥ 8.
+
+Se em algum momento o `uv` reclamar da falta de um `[project]` no `pyproject.toml`, mova esta configuração para um `pytest.ini` com a seção `[pytest]` e as mesmas três chaves. Os comandos do plano usam `.venv/Scripts/python -m pytest`, que não passa pelo `uv`, então isso não deve acontecer.
 
 - [ ] **Step 3: Escrever o teste de vazamento, que vai falhar**
 

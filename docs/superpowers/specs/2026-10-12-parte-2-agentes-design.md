@@ -105,10 +105,23 @@ registro e teto.
 | `gravado` | reproduz as respostas de um `respostas.jsonl`, indexadas pelo hash de `(instrucao, conteudo)` |
 | qualquer outro | levanta exceção; nunca cai para OpenAI (`DECISOES.md#provedor`) |
 
-**Determinismo.** `config.TEMPERATURA = 0` e `seed = config.SEMENTE`, quando o
-provedor aceita. Se o modelo recusar `temperature` (os modelos de raciocínio da
-família GPT-5 costumam recusar), a sonda do §7 mostra, `TEMPERATURA` vira `None`
-e o parâmetro deixa de ser enviado, com registro no `DECISOES.md`. **A geração
+**Modelo: `gpt-6-luna`, com `reasoning_effort="none"`.** Decisão do usuário em
+12/10/2026, substituindo o `gpt-5.6-luna` da spec de 11/10. É o modelo da faixa
+barata na página oficial de comparação da OpenAI nesta data (US$ 0,10 / 0,50 por
+milhão de tokens, saída estruturada e Chat Completions suportados); o
+`gpt-5.6-luna` já não aparece nela e custa o dobro. Raciocínio em `none` por dois
+motivos: sem tokens de raciocínio ocultos não há resposta vazia por
+`finish_reason == "length"` causada pelo raciocínio, e só com `none` a
+`temperature` é aceita. O julgamento pesado já está no crivo determinístico, e o
+LLM preenche parâmetros curtos. Subir o esforço é mudança de configuração, mas
+muda o limpador congelado: é decisão registrada, não ajuste.
+`config.MODELO = "gpt-6-luna"`, `config.ESFORCO_RACIOCINIO = "none"`.
+
+**Determinismo.** `config.TEMPERATURA = 0` e `seed = config.SEMENTE`. A página
+oficial do modelo não diz se aceita `temperature` e `seed`; a aceitação com
+`none` vem de fontes de terceiros (guia da LiteLLM, issues de SDK). A sonda do §7
+confirma. Se algum for recusado, ele vira `None` em `config` e deixa de ser
+enviado, com registro no `DECISOES.md`. **A geração
 não é reprodutível bit a bit.** Ela é reprodutível **dadas as respostas**: o
 cliente grava cada chamada em `saida/<carimbo>/respostas.jsonl`, e
 `PROVEDOR=gravado` refaz o run a partir delas. Diferença entre dois runs pagos
@@ -397,8 +410,9 @@ especificador tende a receber mais detecções.
 
 **O primeiro run, em degraus**, cada um anunciado e aprovado pelo usuário antes:
 
-1. **Sonda:** uma chamada que confirma esquema estrito, `temperature` e `seed` do
-   `gpt-5.6-luna`.
+1. **Sonda:** uma chamada que confirma, no `gpt-6-luna` com
+   `reasoning_effort="none"`, o esquema estrito, `temperature` e `seed`, e mede
+   os tokens de uma resposta curta.
 2. **`beers` com guia**, ~40 chamadas. Medir; olhar o destino das 31 marcações da
    `brewery-name` (§8); se o limpador prestar, congelar o invariante.
 3. **`environment` com guia e os dois braços sem guia**, ~120 chamadas.
@@ -418,6 +432,13 @@ especificador tende a receber mais detecções.
   `ounces` é a forma dos padrões (`Aa Aa Aa` contra `9`), não a quantidade.
   Schema com espaço ou muitas alternâncias de classe é texto livre, observável sem
   gabarito. Só se propõe depois de o primeiro run mostrar que o problema é real.
+
+- **Modelo: `gpt-6-luna` com `reasoning_effort="none"`** (§3.1). **Ressalva de
+  método, obrigatória ao reportar:** a POC 1 rodou com `gpt-4o-mini`, e ela é
+  somente leitura, então não pode ser rodada de novo com o modelo atual. Toda
+  comparação com o placar da POC 1 (24,4% e 13,2% de recall) muda **método e
+  modelo ao mesmo tempo**, e a diferença não se atribui só ao método. A ressalva
+  vai ao lado de cada número, como a do teto de dois terços.
 
 ## 9. Testes
 
@@ -479,7 +500,8 @@ Num branch próprio, cada passo com TDD e prova por mutação:
 8. `e6.escrever`, aviso de truncamento no `medir.py`, teste de identidade do
    motor.
 9. `espinha` com CLI, teste de vazamento em execução, teste de ponta a ponta.
-10. Documentos: `DECISOES.md` (determinismo, falha de API, residual sem guia, veto
+10. Documentos: `DECISOES.md` (modelo e ressalva de método em `#provedor`,
+    determinismo, falha de API, residual sem guia, veto
     no dicionário, domínio como memória, `re` proxy contra `re` inteiro, custo do
     corte de um terço); `REGRAS_DO_LIMPADOR.md` §7; `CLAUDE.md` §9 (espinha,
     tipos, contagem); `CONTINUACAO.md`.
@@ -490,7 +512,8 @@ O run pago (§7) vem depois, e só com aprovação.
 
 | Risco | Medida |
 |---|---|
-| `gpt-5.6-luna` recusa esquema estrito, `temperature` ou `seed` | a sonda do §7 descobre com uma chamada; `SAIDA_ESTRITA` e `TEMPERATURA = None` são o plano B, já no desenho |
+| `gpt-6-luna` recusa esquema estrito, `temperature` ou `seed` | a sonda do §7 descobre com uma chamada; `SAIDA_ESTRITA` e `TEMPERATURA = None` são o plano B, já no desenho |
+| raciocínio em `none` dá regras fracas | subir `ESFORCO_RACIOCINIO` é uma linha de `config`, mas muda o limpador congelado: decisão registrada, com fixture nova |
 | `motor`, `e3_crivo` ou `e6` passam de 200 linhas sem vaga de arquivo | simplificar primeiro, na ordem do §6; nunca espremer formatação nem cortar verificação; reabrir a conversa se nada bastar |
 | um prompt passa de ~40 linhas | reabrir a decisão do §3.5 |
 | o residual infla o F1 na tabela de origem | medição nos dois locais e decomposição por fonte (spec de 11/10, §8) |

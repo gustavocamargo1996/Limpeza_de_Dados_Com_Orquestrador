@@ -123,3 +123,55 @@ def test_reparar_nao_altera_o_dataframe_recebido(tabela):
 )
 def test_distancia_edicao(a, b, esperado):
     assert distancia_edicao(a, b) == esperado
+
+
+def test_nao_reescreve_chave_legitima_e_frequente():
+    df = pd.DataFrame(
+        {"cidade": ["Boston"] * 3 + ["Bosotn"] * 2, "estado": ["MA"] * 5}
+    )
+    novo, reparada = reparar(
+        df, "estado", "moda_condicionada", {"determinantes": ["cidade"]},
+        pd.Series(True, index=df.index),
+    )
+    assert list(novo["cidade"]) == list(df["cidade"])
+    assert not reparada.any()
+
+
+def test_nao_corrige_chave_rara_para_outra_rara():
+    df = pd.DataFrame({"cidade": ["Austin"] * 3 + ["Bosotn", "Boston"], "estado": ["MA"] * 5})
+    m = verdadeiro_em(df, [3])
+    novo, reparada = reparar(
+        df, "estado", "moda_condicionada", {"determinantes": ["cidade"]}, m
+    )
+    assert novo.at[3, "cidade"] == "Bosotn"
+    assert not reparada.any()
+
+
+def test_dicionario_ignora_valor_fora_do_mapa(tabela):
+    m = verdadeiro_em(tabela, [3, 4])
+    novo, reparada = reparar(
+        tabela, "zona", "dicionario", {"mapa": {"N/A": "Desconhecida"}}, m
+    )
+    assert novo.at[3, "zona"] == "Tropical"
+    assert list(reparada) == [False, False, False, False, True, False]
+
+
+def test_esvaziar_nao_conta_celula_ja_vazia(tabela):
+    m = verdadeiro_em(tabela, [4, 5])
+    _, reparada = reparar(tabela, "zona", "esvaziar", {}, m)
+    assert list(reparada) == [False, False, False, False, True, False]
+
+
+def test_vizinho_no_dominio_aceita_distancia_igual_ao_limite(tabela):
+    m = verdadeiro_em(tabela, [2])
+    novo, reparada = reparar(
+        tabela, "zona", "vizinho_no_dominio",
+        {"dominio": ["Tropical"], "distancia": 1}, m,
+    )
+    assert novo.at[2, "zona"] == "Tropical"
+    assert bool(reparada.iloc[2])
+
+
+def test_estrategia_desconhecida_falha_alto(tabela):
+    with pytest.raises(ValueError):
+        reparar(tabela, "zona", "inexistente", {}, verdadeiro_em(tabela, [0]))

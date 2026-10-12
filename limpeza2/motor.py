@@ -112,21 +112,21 @@ def reparar(df, coluna, estrategia, parametros, mascara, funcoes=None, dominanci
 
 
 def _mais_proximo(valor, dominio, distancia_maxima):
-    """O valor do dominio mais proximo, ou None se nenhum estiver perto o bastante."""
+    """O valor do dominio mais proximo dentro do limite, ou None."""
     melhor, menor = None, distancia_maxima + 1
     for candidato in dominio:
         d = distancia_edicao(valor, candidato)
         if d < menor:
             melhor, menor = candidato, d
-    return melhor if menor <= distancia_maxima else None
+    return melhor
 
 
 def _reparar_por_moda(novo, original, coluna, determinantes, alvos, dominancia, reparada):
     """Corrige o determinante quando ele e um erro de digitacao, depois usa a moda do grupo."""
     for det in determinantes:
         frequencia = original[det].value_counts()
-        raros = [v for v, n in frequencia.items() if n == 1]
-        comuns = [v for v, n in frequencia.items() if n >= 2]
+        raros = {v for v, n in frequencia.items() if n == 1}
+        comuns = {v for v, n in frequencia.items() if n >= 2}
         for linha in alvos:
             valor = original.at[linha, det]
             if valor not in raros:

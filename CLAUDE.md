@@ -265,7 +265,7 @@ limpeza2/
   e4_especificador.py   # etapa 4: agente especificador -> JSON de reparo
   e5_residual.py        # etapa 5: rodada residual por entidade -> dicionario
   e6_codificador.py     # etapa 6: agente codificador -> escreve os artefatos de saida
-  espinha.py            # a ordem das etapas, e nada mais (e o CLI de geracao)
+  espinha.py            # a ordem das etapas, e nada mais; o CLI so a chama
 preparar_guia.py        # fora do pacote: sorteia o guia com semente fixa
 medir.py                # fora do pacote: executa o limpador gerado e mede
 ```

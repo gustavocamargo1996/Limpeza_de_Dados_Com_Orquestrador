@@ -128,6 +128,7 @@ def test_perfilar_coluna_sem_linhas_tem_comprimento_zero():
 
 
 def test_contagens_do_perfil_sao_int_do_python():
+    # Guarda de versao do pandas: o pandas 3 ja devolve int, entao nesta versao nao ha RED.
     perfil = perfilar_coluna(pd.Series(["a", "a", "b"]))
     for chave in ("frequentes", "raros", "padroes"):
         assert all(type(n) is int for _, n in perfil[chave])

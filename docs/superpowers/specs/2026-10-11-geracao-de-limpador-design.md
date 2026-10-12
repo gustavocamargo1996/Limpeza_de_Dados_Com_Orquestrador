@@ -93,9 +93,15 @@ limpeza2/
 gabarito.py             # fora do pacote: o UNICO modulo que abre o CSV limpo
 ```
 
-Treze arquivos, exatamente o teto do `CLAUDE.md` §2. Sem folga: declarado como
-risco em §11. Válvula, se houver necessidade de um décimo quarto: dobrar
-`portao.py` dentro de `e6_codificador.py`.
+Treze arquivos. O `CLAUDE.md` §2 admite até quinze, com necessidade demonstrada,
+e o critério que manda é outro: **todo arquivo cabe numa frase que diz o que ele
+faz**. A folga de dois existe para quando `e6_codificador.py` ou `motor.py`
+passarem de 200 linhas — aí separa-se a parte que tem função própria. Fracionar
+pelo tamanho é proibido: um arquivo de 190 linhas com função clara é melhor que
+dois de 95 com funções difusas.
+
+A frase de cada arquivo é o comentário ao lado dele na árvore acima. Se alguma
+precisar de "e", o arquivo faz duas coisas e o desenho está errado.
 
 ### 5.2 A espinha
 
@@ -374,8 +380,8 @@ Todo teste novo vem com prova por mutação, e a mutação usada é registrada.
 
 | Risco | Medida |
 |---|---|
-| 13 arquivos é exatamente o teto, sem folga | válvula declarada: dobrar `portao.py` dentro de `e6_codificador.py` |
-| `e6_codificador.py` perto de 190 linhas | se estourar, encolhe o catálogo de tipos, não a formatação |
+| `e6_codificador.py` e `motor.py` perto de 190 linhas | primeiro simplificar; depois separar a parte com função própria, usando um dos dois arquivos de folga; nunca fracionar pelo tamanho nem espremer a formatação |
+| fracionar demais e perder a noção da função de cada arquivo | cada arquivo tem de caber numa frase sem "e"; é o critério que manda sobre a contagem |
 | o código gerado decora o vocabulário de erros do guia (um estudo mede F1 de 23,5 na detecção do Hospital por isso) | o crivo mede a regra na tabela suja inteira, não nos exemplos; o teste 3 pune a regra agressiva |
 | `gpt-5.6-luna` é mais novo que o conhecimento do assistente | nome em `.env`; formato de saída confirmado contra a API na primeira chamada |
 | o residual infla o F1 na tabela de origem | medição nos dois locais e decomposição por fonte |

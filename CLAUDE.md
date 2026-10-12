@@ -90,9 +90,23 @@ linhas** de código de produção (fora `tests/`). Esta POC tem de caber em:
 
 | Medida | Teto |
 |---|---|
-| arquivos `.py` fora de `tests/` | **13** |
+| arquivos `.py` fora de `tests/` | **13**, e **15** no limite, só com necessidade demonstrada |
 | linhas nesses arquivos | **1.400** |
 | maior arquivo | **200 linhas** |
+
+**O que o teto de arquivos protege não é a contagem, é a legibilidade.** O risco
+que o usuário quer evitar é se perder na função de cada `.py` por estarem muito
+fracionados. Então valem duas regras, e a segunda manda mais que o número:
+
+- Todo arquivo cabe numa frase que diz o que ele faz. Se a frase tiver "e",
+  o arquivo faz duas coisas.
+- **Nunca fracione para caber no teto de linhas.** Se um arquivo passa de 200
+  linhas, primeiro procure o que simplificar; só então separe — e separe pela
+  função, nunca pelo tamanho. Um arquivo de 190 linhas com uma função clara é
+  melhor que dois de 95 com funções difusas.
+
+Os dois arquivos de folga existem para esse caso, não para acomodar desenho
+novo.
 
 Meça antes de todo commit que acrescenta código:
 
@@ -221,8 +235,10 @@ limpeza2/
 gabarito.py             # fora do pacote: o UNICO modulo que abre o CSV limpo
 ```
 
-Treze arquivos: exatamente o teto da seção 2, sem folga. Se precisar de um
-décimo quarto, dobre `portao.py` dentro de `e6_codificador.py`.
+Treze arquivos, cada um com uma função que cabe numa frase. A seção 2 admite até
+quinze, e a folga é para quando `e6_codificador.py` ou `motor.py` passarem de 200
+linhas: aí separa-se a parte que tem função própria, nunca se fraciona pelo
+tamanho.
 
 `gabarito.py` fora do pacote é o que torna o §1 verificável: nenhum módulo de
 `limpeza2/` importa `gabarito`, e o teste de vazamento assevera isso.

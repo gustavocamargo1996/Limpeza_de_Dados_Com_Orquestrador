@@ -279,7 +279,7 @@ fase, `medir.medir(...)`.
 ### Tipos que viajam (`tipos.py`)
 
 `Entrada` (sujo, guia_linhas, guia_pares, perfil, coluna_sujeito) ·
-`Candidata` (coluna, tipo, parametros, raciocinio, metricas_crivo) ·
+`Candidata` (coluna, tipo, parametros, raciocinio, metricas) ·
 `Reparo` (candidata, estrategia, parametros, raciocinio, codigo) ·
 `Residual` (coluna, mapa, justificativas).
 

@@ -133,7 +133,7 @@ Quatro dataclasses em `tipos.py`:
 | Tipo | Campos |
 |---|---|
 | `Entrada` | `sujo: DataFrame`, `guia_linhas: DataFrame`, `guia_pares: DataFrame`, `perfil: Perfil`, `coluna_sujeito: str` |
-| `Candidata` | `coluna`, `tipo`, `parametros: dict`, `raciocinio: str`, `metricas_crivo: dict` |
+| `Candidata` | `coluna`, `tipo`, `parametros: dict`, `raciocinio: str`, `metricas: dict` |
 | `Reparo` | `candidata: Candidata`, `estrategia`, `parametros: dict`, `raciocinio: str`, `codigo: str \| None` |
 | `Residual` | `coluna`, `mapa: dict[str, str]`, `justificativas: dict[str, str]` |
 

@@ -118,9 +118,9 @@ cumpre o "metade da POC 1" que o usuário pediu no começo. Ela cumpre dois ter�
 e a diferença comprou os cinco mecanismos acima. Omitir isso seria apresentar um
 número que o projeto não alcançou.
 
-**Reserva conhecida:** `limpeza2/__init__.py` está vazio e a suíte passa sem ele
-— verificado em 12/10/2026. Se a parte 2 precisar de um décimo sétimo arquivo,
-essa é a vaga livre, e não um pedido para subir o teto de novo.
+**A reserva foi usada.** `limpeza2/__init__.py` estava vazio e foi apagado na
+parte 2 (12/10/2026), abrindo a vaga do 16º arquivo. O projeto fecha em 16 de 16,
+sem folga.
 
 **O que o teto de arquivos protege não é a contagem, é a legibilidade.** O risco
 que o usuário quer evitar é se perder na função de cada `.py` por estarem muito
@@ -270,10 +270,10 @@ preparar_guia.py        # fora do pacote: sorteia o guia com semente fixa
 medir.py                # fora do pacote: executa o limpador gerado e mede
 ```
 
-Quinze arquivos, cada um com uma função que cabe numa frase. A seção 2 admite até
-quinze, e este é o limite: não resta folga. Ela existia para quando `e6_codificador.py` ou `motor.py` passarem de 200
-linhas: aí separa-se a parte que tem função própria, nunca se fraciona pelo
-tamanho.
+Dezesseis arquivos, cada um com uma função que cabe numa frase. É o teto da
+seção 2, e não resta folga: a vaga do 16º veio do `limpeza2/__init__.py`, que
+estava vazio e foi apagado. Se `e6_codificador.py`, `motor.py` ou `e3_crivo.py`
+passarem de 200 linhas, a saída é simplificar, nunca fracionar.
 
 Os dois módulos fora do pacote são os únicos que abrem o CSV limpo, e é isso que
 torna o §1 verificável: nenhum módulo de `limpeza2/` importa `preparar_guia` nem

@@ -84,6 +84,7 @@ limpeza2/
   provedor.py           # entrega o cliente do provedor de LLM escolhido
   portao.py             # valida o Python gerado antes de deixa-lo rodar
   motor.py              # UNICA implementacao de aplicacao de regra
+  limites.py            # calcula os limites que o guia sustenta para uma coluna
   e1_perfil.py          # etapa 1: perfila a tabela suja, lida como texto literal
   e2_detector.py        # etapa 2: agente detector -> predicados candidatos
   e3_crivo.py           # etapa 3: reprova a regra candidata que nao se sustenta
@@ -95,7 +96,7 @@ preparar_guia.py        # fora do pacote: sorteia o guia com semente fixa
 medir.py                # fora do pacote: executa o limpador gerado e mede
 ```
 
-Quatorze arquivos. O `CLAUDE.md` §2 admite até quinze, com necessidade demonstrada,
+Quinze arquivos (`limites.py` separa o que o guia sustenta da decisão do crivo). O `CLAUDE.md` §2 admite até quinze, com necessidade demonstrada,
 e o critério que manda é outro: **todo arquivo cabe numa frase que diz o que ele
 faz**. A folga de dois existe para quando `e6_codificador.py` ou `motor.py`
 passarem de 200 linhas — aí separa-se a parte que tem função própria. Fracionar

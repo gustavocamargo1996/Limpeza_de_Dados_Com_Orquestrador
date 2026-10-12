@@ -4,8 +4,9 @@ import pytest
 
 from limpeza2 import config
 from limpeza2.e3_crivo import (
-    _marca_valor_certificado, _reprovar_reparo, crivar_deteccao, crivar_reparo, teto_da_coluna,
+    _marca_valor_certificado, _reprovar_reparo, crivar_deteccao, crivar_reparo,
 )
+from limpeza2.limites import teto_da_coluna
 from limpeza2.tipos import Candidata, Entrada, Perfil, Reparo
 
 

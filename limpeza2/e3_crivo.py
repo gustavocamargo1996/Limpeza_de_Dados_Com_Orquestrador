@@ -1,9 +1,10 @@
 """Etapa 3: reprova a regra candidata que nao se sustenta, sem LLM e sem gabarito."""
-from math import sqrt
-
 import pandas as pd
 
 from limpeza2 import config
+from limpeza2.limites import (
+    celulas_sujas_do_guia, taxa_da_uniao, teto_da_coluna, valores_certificados,
+)
 from limpeza2.motor import detectar, reparar
 
 MOTIVOS = (
@@ -36,7 +37,7 @@ def _limitar_uniao(coluna, vencedoras):
     # Empate de taxa: o nome do tipo em ordem alfabetica decide, sem depender da lista de entrada.
     ordem = sorted(vencedoras, key=lambda v: (-v[0].metricas["taxa"], v[0].tipo))
     while len(ordem) > 1:
-        uniao = pd.concat([m for _, m in ordem], axis=1).any(axis=1).mean()
+        uniao = taxa_da_uniao([m for _, m in ordem])
         if uniao <= ordem[0][0].metricas["teto"]:
             return
         descartada = ordem.pop(0)[0]
@@ -101,23 +102,11 @@ def _reprovar(candidata, entrada, mascara):
     return None
 
 
-def teto_da_coluna(entrada, coluna):
-    """O teto de marcacao da coluna: o a priori, ou a taxa suja do guia mais 2 erros padrao."""
-    linhas = entrada.guia_linhas.index.intersection(entrada.sujo.index)
-    if coluna not in entrada.guia_linhas.columns or len(linhas) == 0:
-        return config.TETO_MARCACAO
-    certo = entrada.guia_linhas.loc[linhas, coluna]
-    suja = float((entrada.sujo.loc[linhas, coluna] != certo).mean())
-    # Margem de 2 erros padrao de uma proporcao no pior caso (p = 0,5).
-    return max(config.TETO_MARCACAO, suja + 2 * sqrt(0.25 / len(linhas)))
-
-
 def _marca_valor_certificado(entrada, coluna, mascara):
     """A mascara marca celula cujo valor o guia mostra como correto na coluna."""
     if coluna not in entrada.guia_linhas.columns:
         return False
-    certificados = set(entrada.guia_linhas[coluna])
-    return bool(entrada.sujo[coluna][mascara].isin(certificados).any())
+    return bool(entrada.sujo[coluna][mascara].isin(valores_certificados(entrada, coluna)).any())
 
 
 def _celulas_certas(entrada, coluna, mascara):
@@ -170,7 +159,7 @@ def _reprovar_reparo(entrada, novo, reparada, proposta, mascara):
     alvo = proposta.candidata.coluna
     celulas = [(int(p.linha), p.coluna, p.limpo)
                for p in pares[pares["coluna"].isin(colunas)].itertuples()]
-    for linha, coluna, limpo in celulas + _sujas_do_guia(entrada, alvo):
+    for linha, coluna, limpo in celulas + celulas_sujas_do_guia(entrada, alvo):
         if linha in novo.index and bool(mascara.get(linha, False)):
             # Determinante so responde pela celula que o reparo escreveu.
             if coluna != alvo and novo.at[linha, coluna] == entrada.sujo.at[linha, coluna]:
@@ -178,15 +167,6 @@ def _reprovar_reparo(entrada, novo, reparada, proposta, mascara):
             if novo.at[linha, coluna] != limpo:
                 return "perde_par_do_guia"
     return None
-
-
-def _sujas_do_guia(entrada, coluna):
-    """As celulas da coluna em que o guia corrige o sujo, no formato (linha, coluna, limpo)."""
-    if coluna not in entrada.guia_linhas.columns:
-        return []
-    linhas = entrada.guia_linhas.index.intersection(entrada.sujo.index)
-    guia = entrada.guia_linhas.loc[linhas, coluna]
-    return [(int(linha), coluna, guia[linha]) for linha in linhas[entrada.sujo.loc[linhas, coluna] != guia]]
 
 
 def _escreveu_errado_no_guia(entrada, novo):

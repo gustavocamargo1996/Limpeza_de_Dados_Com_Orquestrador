@@ -9,21 +9,38 @@ from limpeza2.motor import detectar, reparar
 MOTIVOS = (
     "aprovada", "marca_celula_correta", "vacua", "marca_demais", "perde_par_do_guia",
     "ambigua", "sem_perfil", "lancou", "nao_repara", "corrompe_celula_do_guia",
+    "marca_valor_certificado", "uniao_acima_do_teto",
 )
+TIPOS_DE_VALOR = ("formato", "dominio", "faixa", "ausente_disfarcado")
 
 
 def crivar_deteccao(candidatas, entrada):
-    """Aplica os cinco testes e devolve, por (coluna, tipo), a que marca menos."""
-    sobreviventes = {}
+    """Crivo da deteccao: menor taxa por (coluna, tipo), e a uniao por coluna cabe no teto."""
+    vencedoras = {}
     for candidata in candidatas:
         mascara = _mascara(candidata, entrada)
         if mascara is None:
             continue
         chave = (candidata.coluna, candidata.tipo)
-        anterior = sobreviventes.get(chave)
-        if anterior is None or candidata.metricas["taxa"] < anterior.metricas["taxa"]:
-            sobreviventes[chave] = candidata
-    return [c for c in candidatas if sobreviventes.get((c.coluna, c.tipo)) is c]
+        anterior = vencedoras.get(chave)
+        if anterior is None or candidata.metricas["taxa"] < anterior[0].metricas["taxa"]:
+            vencedoras[chave] = (candidata, mascara)
+    for coluna in {c for c, _ in vencedoras}:
+        _limitar_uniao(coluna, [v for (c, _), v in vencedoras.items() if c == coluna])
+    finais = {id(c) for c, _ in vencedoras.values() if c.metricas["motivo"] == "aprovada"}
+    return [c for c in candidatas if id(c) in finais]
+
+
+def _limitar_uniao(coluna, vencedoras):
+    """Descarta, da maior taxa para a menor, os tipos ate a uniao das mascaras caber no teto."""
+    # Empate de taxa: o nome do tipo em ordem alfabetica decide, sem depender da lista de entrada.
+    ordem = sorted(vencedoras, key=lambda v: (-v[0].metricas["taxa"], v[0].tipo))
+    while len(ordem) > 1:
+        uniao = pd.concat([m for _, m in ordem], axis=1).any(axis=1).mean()
+        if uniao <= ordem[0][0].metricas["teto"]:
+            return
+        descartada = ordem.pop(0)[0]
+        descartada.metricas.update(motivo="uniao_acima_do_teto", taxa_uniao=float(uniao))
 
 
 def _mascara(candidata, entrada):
@@ -67,6 +84,10 @@ def _reprovar(candidata, entrada, mascara):
             return "ambigua"
     if _celulas_certas(entrada, candidata.coluna, mascara):
         return "marca_celula_correta"
+    if candidata.tipo in TIPOS_DE_VALOR and _marca_valor_certificado(
+        entrada, candidata.coluna, mascara
+    ):
+        return "marca_valor_certificado"
     if candidata.metricas["marcadas"] == 0:
         return "vacua"
     if candidata.metricas["taxa"] > candidata.metricas["teto"]:
@@ -89,6 +110,14 @@ def teto_da_coluna(entrada, coluna):
     suja = float((entrada.sujo.loc[linhas, coluna] != certo).mean())
     # Margem de 2 erros padrao de uma proporcao no pior caso (p = 0,5).
     return max(config.TETO_MARCACAO, suja + 2 * sqrt(0.25 / len(linhas)))
+
+
+def _marca_valor_certificado(entrada, coluna, mascara):
+    """A mascara marca celula cujo valor o guia mostra como correto na coluna."""
+    if coluna not in entrada.guia_linhas.columns:
+        return False
+    certificados = set(entrada.guia_linhas[coluna])
+    return bool(entrada.sujo[coluna][mascara].isin(certificados).any())
 
 
 def _celulas_certas(entrada, coluna, mascara):
@@ -138,16 +167,26 @@ def _reprovar_reparo(entrada, novo, reparada, proposta, mascara):
     if proposta.estrategia == "moda_condicionada":
         colunas |= set(proposta.parametros["determinantes"])
     pares = entrada.guia_pares
-    for _, par in pares[pares["coluna"].isin(colunas)].iterrows():
-        linha = int(par["linha"])
+    alvo = proposta.candidata.coluna
+    celulas = [(int(p.linha), p.coluna, p.limpo)
+               for p in pares[pares["coluna"].isin(colunas)].itertuples()]
+    for linha, coluna, limpo in celulas + _sujas_do_guia(entrada, alvo):
         if linha in novo.index and bool(mascara.get(linha, False)):
-            coluna = par["coluna"]
             # Determinante so responde pela celula que o reparo escreveu.
-            if coluna != proposta.candidata.coluna and novo.at[linha, coluna] == entrada.sujo.at[linha, coluna]:
+            if coluna != alvo and novo.at[linha, coluna] == entrada.sujo.at[linha, coluna]:
                 continue
-            if novo.at[linha, coluna] != par["limpo"]:
+            if novo.at[linha, coluna] != limpo:
                 return "perde_par_do_guia"
     return None
+
+
+def _sujas_do_guia(entrada, coluna):
+    """As celulas da coluna em que o guia corrige o sujo, no formato (linha, coluna, limpo)."""
+    if coluna not in entrada.guia_linhas.columns:
+        return []
+    linhas = entrada.guia_linhas.index.intersection(entrada.sujo.index)
+    guia = entrada.guia_linhas.loc[linhas, coluna]
+    return [(int(linha), coluna, guia[linha]) for linha in linhas[entrada.sujo.loc[linhas, coluna] != guia]]
 
 
 def _escreveu_errado_no_guia(entrada, novo):

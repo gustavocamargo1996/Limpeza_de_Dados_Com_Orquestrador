@@ -119,8 +119,8 @@ def gerar_limpador(caminho_sujo, caminho_guia, destino):
     return e6_codificador.escrever(reparos, residual, entrada, destino)
 ```
 
-O crivo aparece duas vezes de propósito: o controle negativo das linhas limpas
-do guia vale tanto para a regra que detecta quanto para a que repara. É o que
+O crivo aparece duas vezes de propósito: o controle por célula do guia
+(`sujo == guia`) vale tanto para a regra que detecta quanto para a que repara. É o que
 justifica ele ser módulo próprio.
 
 A validação não está na espinha, porque é a outra fase:
@@ -184,7 +184,7 @@ entidade. Minerar e deixar o LLM julgar, como o Cocoon faz com dependências.
 
 O prompt leva: o schema completo; o perfil compacto daquela coluna, em uma linha
 por item, no estilo do catálogo do CatDB; os pares candidatos em que a coluna é o
-lado determinado, com os cinco números acima; as linhas limpas do guia; e os
+lado determinado, com os cinco números acima; as linhas corrigidas do guia; e os
 pares `sujo → limpo` que caem naquela coluna.
 
 Devolve candidatas de um **catálogo fechado de cinco tipos**, em ordem de
@@ -215,24 +215,27 @@ Executa cada candidata sobre o sujo pelo `motor.py` e aplica cinco testes:
 
 | # | Teste | Reprova quando | Lição que endereça |
 |---|---|---|---|
-| 1 | controle negativo | marca qualquer célula das linhas limpas do guia | `CLAUDE.md` §1 |
+| 1 | controle por célula | `marca_celula_correta`: marca célula do guia em que `sujo == guia`, na coluna da regra; `marca_valor_certificado`: nos tipos de valor, marca célula cujo valor o guia mostra como correto | `CLAUDE.md` §1 |
 | 2 | não-vacuidade | marca zero células no sujo | lição 6 |
-| 3 | teto de marcação | marca mais que `TETO_MARCACAO` da coluna | lição 4 |
+| 3 | teto de marcação | marca mais que o teto da coluna (`marca_demais`) | lição 4 |
 | 4 | piso do guia | há pares na coluna e a regra não marca todos | — |
 | 5 | ambiguidade (só `dependencia`) | `frac_ambiguos` acima do limiar | — |
 
 Entre as variantes sobreviventes do mesmo tipo fica a de **menor taxa de
 marcação** que ainda passa no teste 4. Tipos diferentes na mesma coluna
-coexistem, e a máscara final é a união.
+coexistem, mas a união das máscaras tem de caber no teto da coluna: se estourar,
+descartam-se tipos, do de maior taxa para o de menor (empate: ordem alfabética
+do tipo), até caber (`uniao_acima_do_teto`).
 
 Em coluna sem par no guia, o teste 4 não se aplica, e os testes 1 a 3 decidem
-sozinhos. É isso que substitui o gate de 100% da POC 1, que passava por
+sozinhos. Marcar célula do guia em que `sujo != guia` é correto e não reprova. É isso que substitui o gate de 100% da POC 1, que passava por
 vacuidade.
 
-`TETO_MARCACAO` **não pode ser calibrado**: olhar a taxa real de erro por coluna
-para escolher o número seria ler o gabarito. Fica fixado *a priori* em 30%, com
-a justificativa escrita em `docs/DECISOES.md`. Consequência declarada: coluna com
-mais de 30% de erro é subdetectada, e isso é limite do método, não defeito.
+O teto é por coluna: `max(TETO_MARCACAO, taxa_suja_no_guia + 2 * sqrt(0,25 / n))`,
+com `TETO_MARCACAO = 0,30` fixado *a priori* como piso (não pode ser calibrado
+com o gabarito) e `n` as linhas do guia. Sem guia, o teto é exatamente 0,30. O teto
+usado vai em `metricas["teto"]`. Justificativa e limites em
+`docs/DECISOES.md#teto-de-marcacao`.
 
 ### Etapa 4 — especificador (uma chamada por detecção aprovada)
 
@@ -261,8 +264,10 @@ caracteres adjacentes custa uma edição. Em Levenshtein puro, `Bosotn` → `Bos
 custa 2, e a transposição — provavelmente a classe mais comum de erro de
 digitação — ficaria fora do método. São quatro linhas a mais no cálculo.
 
-Depois, `crivar_reparo` reprova a estratégia que altere célula das linhas limpas
-do guia, que não reproduza os pares daquela coluna, ou que repare zero células
+Depois, `crivar_reparo` reprova a estratégia que escreva em célula do guia um valor
+diferente do guia (`corrompe_celula_do_guia`; não escrever não reprova nesse
+teste), que não reproduza os pares e as células sujas do guia na coluna-alvo
+(`perde_par_do_guia`), ou que repare zero células
 detectadas.
 
 ### Etapa 5 — residual (a aposta de recall)
@@ -277,7 +282,7 @@ flag.
    para 0,164 com grupos aleatórios.
 3. Devolve `{valor_sujo: valor_limpo}` com justificativa por entrada, e `null`
    onde não sabe.
-4. Passa pelo mesmo crivo: nenhuma entrada pode alterar célula limpa do guia.
+4. Passa pelo mesmo crivo: nenhuma entrada pode escrever em célula do guia um valor diferente do guia.
 5. É congelado como literal no limpador. Nenhuma chamada de LLM em execução.
 
 **Limitação declarada.** O dicionário é por coluna e valor. Cobre qualquer linha
@@ -308,17 +313,19 @@ casa com o portão da POC 1, que mantém `pd` fora do namespace e oferece `re`.
 
 ## 7. Guia
 
-`preparar_guia.sortear(dataset, semente)` grava, em `dados/guia/<ds>/`:
+`preparar_guia.gravar(dataset, sujo, limpo, semente, n_linhas, pares_por_coluna, destino=None)`
+grava, em `dados/guia/<destino ou ds>/`:
 
-- `guia_linhas.csv`: até 20 linhas sorteadas entre as que estão 100% corretas (20 é teto: o `beers` tem 5 em 300, e o guia dele ficou com essas cinco).
+- `guia_linhas.csv`: 20 linhas sorteadas de qualquer parte da tabela, com os valores do limpo (referência corrigida; 20 × 11 = 220 células rotuladas no `beers`).
 - `guia_pares.csv`: colunas `linha, coluna, sujo, limpo`, até 2 pares por coluna
   que tem erro.
+- `guia_receita.txt`: dataset, semente, linhas e pares por coluna; registro para humano, nenhum módulo o lê.
 
 Semente fixa em `config.py`. Gerado uma vez e commitado. A geração lê os CSVs,
 nunca executa o sorteio.
 
 **Braço sem guia:** a mesma espinha com os dois CSVs vazios. Os testes 1 e 4 do
-crivo não se aplicam, e sobram a não-vacuidade e o teto. A diferença entre os
+crivo não se aplicam, e sobram a não-vacuidade e o teto (0,30 exato). A diferença entre os
 braços é quanto o guia vale.
 
 ## 8. Medição
@@ -328,7 +335,7 @@ precisão igual a alterações corretas sobre alterações, recall igual a alter
 corretas sobre erros, F1 harmônico, mais a contagem de flags.
 
 Calculada **executando o arquivo gerado**. O holdout tira da métrica toda linha
-que apareceu no guia: as 20 limpas e as linhas dos pares. O número de linhas
+que apareceu no guia: as 20 do guia e as linhas dos pares. O número de linhas
 descontadas é publicado ao lado de cada F1.
 
 Dois locais de medição, ambos publicados:
@@ -393,7 +400,7 @@ Todo teste novo vem com prova por mutação, e a mutação usada é registrada.
 | o código gerado decora o vocabulário de erros do guia (um estudo mede F1 de 23,5 na detecção do Hospital por isso) | o crivo mede a regra na tabela suja inteira, não nos exemplos; o teste 3 pune a regra agressiva |
 | `gpt-5.6-luna` é mais novo que o conhecimento do assistente | nome em `.env`; formato de saída confirmado contra a API na primeira chamada |
 | o residual infla o F1 na tabela de origem | medição nos dois locais e decomposição por fonte |
-| `TETO_MARCACAO` escolhido sem calibração | fixado a priori com justificativa; limite declarado |
+| `TETO_MARCACAO` escolhido sem calibração | fixado a priori como piso; o teto sobe por coluna com a taxa suja do guia |
 
 ## 12. Como esta POC se compara, e por que a comparação favorece a POC 1
 

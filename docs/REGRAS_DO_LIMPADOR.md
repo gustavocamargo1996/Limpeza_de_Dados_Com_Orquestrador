@@ -297,7 +297,14 @@ Três variantes de cada regra são geradas, e entre as que sobrevivem fica a de
 **menor taxa de marcação** que ainda passa no piso. É a escolha conservadora, e é
 explicável numa frase.
 
-Os cinco tipos de erro coexistem na mesma coluna: a máscara final é a união.
+Duas salvaguardas completam o crivo. O **veto por valor certificado**
+(`marca_valor_certificado`): regra de `formato`, `dominio`, `faixa` ou
+`ausente_disfarcado` que marca célula cujo valor o guia mostra como correto na
+coluna se contradiz, e é reprovada (`dependencia` fica de fora, porque o erro está
+no contexto da linha). É ele que impede a regra degenerada em `ounces`, onde o
+teto passa de 1. E a **união por coluna**: os cinco tipos coexistem, mas a união
+das máscaras tem de caber no teto da coluna; se estourar, descartam-se tipos,
+do de maior taxa ao de menor, até caber. Detalhes em `docs/DECISOES.md#teto-de-marcacao`.
 
 ### Sobre o teto de marcação
 

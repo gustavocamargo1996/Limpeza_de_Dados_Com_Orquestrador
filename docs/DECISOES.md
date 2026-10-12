@@ -96,13 +96,34 @@ de erro amostral, que se sustenta lendo só o tamanho do guia. Mas o autor
 com a taxa de erro real, e essa verificação usou o gabarito (`beers`: `ounces`
 1,00 contra 0,98 real, `ibu` 0,40 contra 0,37, `abv` 0,35 contra 0,23;
 `environment`: `State` 0,10 contra 0,18). É confirmação posterior: não foi o que
-escolheu a fórmula, e o número 2 não foi ajustado.
+escolheu a fórmula, e o número 2 não foi ajustado. A evidência é limitada: cobre
+**dois** datasets e **uma** semente de 20 linhas.
 
 **Consequência declarada.** O guia agora supervisiona também o teto: um guia
 pequeno e azarado pode subir o teto de uma coluna que é limpa (`Climate_Zone`:
 guia 0,20, real 0,09, teto 0,42). O custo é aceito porque os outros testes do
 crivo continuam valendo. A regra `^[A-Z]{2}$` que marcava 300 de 300 em `State`
 continua morrendo (teto 0,32), e esse caso não pode voltar.
+
+### Dois testes para o que o teto não alcança
+
+**Veto por valor certificado (`marca_valor_certificado`).** Em `ounces` o teto
+passa de 1 e `marca_demais` fica desligado, e o guia não tem célula correta de
+`ounces` para o controle por célula. O guia certifica valores: se uma regra dos
+tipos `formato`, `dominio`, `faixa` ou `ausente_disfarcado` marca célula cujo valor
+sujo é **igual** (não substring) a um valor do guia naquela coluna, ela se
+contradiz. Não vale para `dependencia`, em que o erro está no contexto da linha.
+Medido com o gabarito (confirmação posterior): células realmente erradas que
+carregam valor certificado: `beers` 0 de 495 nas cinco colunas com erro;
+`environment` `State` 49 de 54 e `Climate_Zone` 26 de 26 (as duas precisam de
+`dependencia`), 0 de 254 nas outras cinco. Posição: logo após `marca_celula_correta`,
+por ser a mesma evidência direta de falso positivo.
+
+**União por coluna (`uniao_acima_do_teto`).** A escolha entre variantes é por
+`(coluna, tipo)`, então tipos diferentes coexistem e a máscara final é a união,
+que nenhum teto examinava. Depois da escolha, se a união passar do teto da coluna,
+descartam-se tipos, do de maior taxa ao de menor (empate: ordem alfabética do
+tipo), até caber; o descartado guarda `taxa_uniao` em `metricas`.
 
 ### `DET_MINIMO` é o complemento deste número
 
@@ -248,8 +269,9 @@ variantes sujas.
 regra: reprova (`marca_celula_correta`) quem marca célula do guia com
 `sujo == guia`; marcar célula com `sujo != guia` é correto. No reparo, onde ele
 escreveu em célula do guia o valor tem de ser o do guia
-(`corrompe_celula_do_guia`); não escrever não reprova, pela mesma razão do piso
-do par (`#par-exige-valor-exato`).
+(`corrompe_celula_do_guia`); não escrever não reprova *nesse* teste. A coluna-alvo
+cobra o valor certo mesmo sem escrita, pelo piso do par
+(`#par-exige-valor-exato`), que vale também para as células sujas do guia.
 
 *Custo.* Mais supervisão: 20 × 11 = 220 células rotuladas no lugar de 55 no
 `beers`, usadas como oráculo de correção. Ela tem de ser reportada ao lado de
@@ -380,6 +402,14 @@ dela sem condição reprovaria reparo válido por célula que ele nunca toca (pa
 `cidade`, reparo que só conserta `estado`). O filtro por coluna impede ainda que
 um par de `onca` reprove um reparo de `estado`. Linha de par fora da máscara não
 é verificada: a detecção não a marcou.
+
+**Células sujas do guia valem como par.** Na coluna-alvo, célula do guia com
+`sujo != guia` que esteja na máscara exige `novo == guia`, mesmo que o reparo não
+tenha escrito: é o mesmo piso do par explícito, com o mesmo motivo
+(`perde_par_do_guia`). Só a coluna **determinante** é poupada quando o reparo não
+escreveu nela. Na **detecção** as células sujas do guia não entram no piso: isso
+exigiria marcar todas e rejeitaria regra que pega só um dos tipos de erro da
+coluna. Pendência da parte 2.
 
 **O preço.** Mudança de comportamento: estratégias como `esvaziar` e
 `vizinho_no_dominio`, que não alcançam o valor exato do par, passam a ser

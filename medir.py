@@ -51,7 +51,8 @@ def avaliar(caminho_limpador, caminho_sujo, caminho_limpo, holdout=None):
     limpo = pd.read_csv(caminho_limpo, **config.LER_CSV)
     with warnings.catch_warnings():
         # O LLM escreve regex nao-raw e com grupos: SyntaxWarning ao importar, UserWarning ao aplicar.
-        warnings.simplefilter("ignore")
+        warnings.filterwarnings("ignore", category=SyntaxWarning)
+        warnings.filterwarnings("ignore", category=UserWarning)
         modulo = carregar(caminho_limpador)
         if hasattr(modulo, "aplicar_detalhado"):
             corrigido, flags, fontes = modulo.aplicar_detalhado(sujo)

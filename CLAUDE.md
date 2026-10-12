@@ -60,6 +60,14 @@ dois artefatos, com donos e momentos diferentes:
 | Quem produz, num caso real | um humano que abre o dataset e, por inspeção visual, separa algumas linhas certas e alguns erros grosseiros com a correção | já existe (benchmark) ou é construído à parte |
 | Para que serve | um few-shot: mostrar ao LLM o schema, o formato de cada campo, o relacionamento entre campos e exemplos de erro | medir se o limpador é bom |
 
+As 20 linhas são um **teto, não uma garantia**. Medido em 12/10/2026: o
+`beers_dirty_300` tem apenas **5 linhas sem nenhum erro**, porque a coluna
+`ounces` está errada em 295 das 300 linhas; o `environment_dirty_300` tem 85.
+Onde não houver 20 linhas totalmente limpas, o guia sai menor, e o tamanho real
+dele é reportado ao lado de cada número. A consequência é que no `beers` o
+controle negativo fica fraco — 5 linhas vezes 11 colunas, 55 células — e isso
+precisa ser dito ao reportar o resultado desse dataset.
+
 **O gabarito nunca é lido pela geração**, nem para amostrar, nem para validar
 regra, nem para escolher parâmetro. A geração lê o sujo e o guia, e só. Se o
 gabarito vazar para a geração, a POC mede memorização e todo número publicado
@@ -164,10 +172,15 @@ de aplicação.
 Todo Python escrito por LLM é validado antes de rodar: análise da AST com
 allowlist de builtins, proibição de `import`, dunder, `eval`/`exec`/`open`/
 `getattr`, e execução em namespace descartável, nunca `globals()`. Afrouxar o
-portão é decisão de segurança, não conveniência. A POC 1 tem uma
-implementação pronta e testada em
-`../POC_Limpeza_de_Dados/limpeza/sandbox.py`. Pode copiar e adaptar, mas o
-teto de tamanho também vale para ela.
+portão é decisão de segurança, não conveniência.
+
+A POC 1 tem uma implementação em `../POC_Limpeza_de_Dados/limpeza/sandbox.py`,
+que foi copiada e adaptada. **Ela tem um escape**, confirmado por execução em
+12/10/2026: ela entrega o módulo `re` ao namespace, e dele se alcança
+`re.enum.sys.modules["os"]`. O portão desta POC entrega um **proxy** de `re`,
+barra leitura de `.format` e `.format_map`, barra escrita e remoção de atributo,
+e constrói um proxy novo por materialização. Detalhe e evidência em
+`docs/DECISOES.md#portao-ast`. Não copie mais nada de lá sem sondar primeiro.
 
 O limpador gerado roda **sem** o portão na máquina do usuário. O cabeçalho
 dele avisa isso.
@@ -265,8 +278,8 @@ fase, `medir.medir(...)`.
 
 ### Tipos que viajam (`tipos.py`)
 
-`Entrada` (sujo, guia_linhas, guia_pares, perfil, coluna_sujeito) ·
-`Candidata` (coluna, tipo, parametros, raciocinio, metricas_crivo) ·
+`Entrada` (sujo, guia_linhas, guia_pares, perfil; `coluna_sujeito` fica para a parte 2, ainda não está em `tipos.py`) ·
+`Candidata` (coluna, tipo, parametros, raciocinio, metricas) ·
 `Reparo` (candidata, estrategia, parametros, raciocinio, codigo) ·
 `Residual` (coluna, mapa, justificativas).
 

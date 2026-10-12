@@ -77,6 +77,48 @@ inteira.
 limite do método. Trocar o número depois de ver um resultado ruim seria ajustar
 ao gabarito pela porta dos fundos.
 
+### `DET_MINIMO` é o complemento deste número
+
+`DET_MINIMO = 0.70`: uma dependência entre colunas só vira candidata se valer em
+pelo menos 70% das linhas. **É a mesma premissa de `TETO_MARCACAO`, dita uma vez
+só.** Se o projeto declara não acreditar que uma coluna esteja mais de 30%
+errada, então uma dependência verdadeira não pode falhar em mais de 30% das
+linhas.
+
+A primeira versão usava 0,85, e isso tinha um defeito perverso: a razão de
+determinação cai **justamente porque a coluna tem erro**. No `environment`,
+`City → State` tem razão de 0,82, porque 54 das 300 células de `State` estão
+erradas — e o limiar de 0,85 rejeitava exatamente a dependência que corrigiria
+esses 54 erros. O limiar punia o caso que a regra existe para consertar.
+
+### O suporte se mede em linhas, não em grupos
+
+A primeira versão exigia **dez grupos** de chave repetida (`GRUPOS_MINIMOS = 10`).
+Isso era erro conceitual, e ele zerava a etapa: no `environment`, **nenhum** par
+de colunas passava o filtro, então o tipo `dependencia` — a aposta central de
+recall da POC — nunca dispararia no dataset onde ele importa.
+
+Medido no sujo, sem gabarito, em 12/10/2026:
+
+| Par | Grupos | Linhas cobertas | Razão | Grupos ambíguos | Veredito antigo |
+|---|---|---|---|---|---|
+| `City → State` | 9 | 300 (100%) | 0,820 | 0% | **rejeitado**, por 9 < 10 |
+| `PM2.5 → Climate_Zone` | 3 | 8 (3%) | 0,875 | 33% | rejeitado, por sorte |
+| `Temperature → Climate_Zone` | 46 | 105 (35%) | 0,800 | 41% | **passaria** |
+
+Nove grupos cobrindo a tabela inteira é a evidência mais forte possível, e era
+rejeitada por um grupo. Quarenta e seis grupos cobrindo um terço das linhas, com
+41% deles sem maioria clara, é ruído, e passaria. O critério certo é **quantas
+linhas vivem em grupos com suporte**, não quantos grupos existem:
+`COBERTURA_MINIMA = 0.50` e `GRUPOS_MINIMOS_PAR = 2`.
+
+Com os números novos, sete pares passam no `environment`, todos com ambiguidade
+zero, e `City → State` acusa exatamente **54** células divergentes enquanto
+`City → Climate_Zone` acusa **26** — que são os números de erro reais dessas
+colunas. Essa conferência é **posterior à decisão** e foi feita com a métrica,
+que é ferramenta de validação; ela não escolheu os limiares. O que escolheu foi o
+argumento do complemento, que se sustenta lendo só o `config.py`.
+
 ---
 
 ## O residual é congelado como dicionário {#residual-congelado}
@@ -103,8 +145,10 @@ medição acontece em dois lugares e o recall é decomposto por fonte.
 ## Uma única implementação da aplicação de regra {#motor-unico}
 
 **Decisão.** `motor.py` é a única implementação. O crivo o importa; o codificador
-copia o texto-fonte dele inteiro para dentro do limpador. Um teste assevera a
-igualdade byte a byte.
+copia o texto-fonte dele inteiro para dentro do limpador. O teste que assevera a
+igualdade byte a byte é pendência declarada da parte 2, que escreve o
+codificador; até lá, `tests/test_vazamento.py` só trava os imports do `motor.py`
+em `{"pandas"}`, para o texto copiado não quebrar o limpador entregue.
 
 **Por quê.** Na POC 1 a lógica existia duas vezes, uma na POC e uma cópia
 congelada dentro do limpador, e as duas divergiram. Um run publicou F1 de 100%
@@ -112,8 +156,8 @@ numa coluna em que o limpador entregue marcava zero células. Consertar custou u
 projeto inteiro (lição 8).
 
 **Por que copiar em vez de importar.** O limpador tem de rodar sem depender deste
-repositório. A cópia é mecânica e verificada por igualdade, não mantida à mão —
-é isso que a diferencia do defeito da POC 1.
+repositório. A cópia é mecânica e, na parte 2, será verificada por igualdade, não mantida à
+mão — é isso que a diferencia do defeito da POC 1.
 
 ---
 
@@ -127,6 +171,13 @@ fonte.
 se mede. Não é vazamento de gabarito — o LLM nunca vê a resposta certa — mas é
 ajustar o artefato à tabela em que ele é avaliado. Com um número só, memorização
 e capacidade ficariam somadas e indistinguíveis.
+
+**Limitação conhecida da precisão publicada.** A fórmula é a da POC 1, de
+propósito. Coluna sem nenhum erro é "não mensurável" e fica fora do total, então
+um limpador que estraga uma coluna perfeitamente limpa recebe precisão 1,0 nessa
+coluna. `flags` é o único lugar onde isso aparece. Nenhuma fixture está nesse
+estado hoje; um teste (`..._limitacao_conhecida`) trava o comportamento. Mudar a
+fórmula moveria números ancorados e é decisão do usuário.
 
 **Viabilidade verificada.** As 300 linhas do `environment` são 300 das 1.000 do
 arquivo completo, e as do `beers` são 300 das 2.410. No `beers`, duas colunas
@@ -152,8 +203,9 @@ invariante verificável por import, em vez de uma convenção que depende de
 disciplina. O teste de vazamento fica trivial: nenhum módulo de `limpeza2/`
 importa nenhum dos dois.
 
-**Sobre o sorteio.** Decisão do usuário: 20 linhas sorteadas entre as que estão
-100% corretas, e até 2 pares `sujo → limpo` por coluna que tem erro. A cota por
+**Sobre o sorteio.** Decisão do usuário: até 20 linhas sorteadas entre as que
+estão 100% corretas (20 é teto: medido, o `beers` tem **5** linhas 100% limpas
+em 300, e o guia dele ficou com exatamente essas cinco), e até 2 pares `sujo → limpo` por coluna que tem erro. A cota por
 coluna imita o humano varrendo coluna a coluna e garante exemplo onde o sorteio
 puro não chegaria. Gerado uma vez, commitado, igual entre runs.
 
@@ -202,16 +254,89 @@ brainstorming).
 
 ## Portão AST {#portao-ast}
 
-**Decisão.** Adaptado de `../POC_Limpeza_de_Dados/limpeza/sandbox.py`: allowlist
-de builtins, proibição de `import`, dunder, `eval`, `exec`, `compile`, `open`,
-`getattr` e companhia, execução em namespace descartável, nunca `globals()`.
+**Decisão.** Adaptado de `../POC_Limpeza_de_Dados/limpeza/sandbox.py`, com quatro
+correções que a POC 1 não tem: allowlist de builtins, proibição de `import`,
+dunder, `eval`, `exec`, `compile`, `open`, `getattr` e companhia, execução em
+namespace descartável e nunca `globals()`, **um proxy de `re` em vez do módulo**,
+**proibição de ler `.format` e `.format_map`**, **proibição de escrever ou apagar
+atributo**, e **um proxy novo por materialização**.
 
-**Por quê.** Já é implementação testada, e cabe no orçamento com 142 linhas.
-`re` fica disponível no namespace e `pd` fora — o que casa com a decisão de o
-LLM escrever só funções escalares.
+**Por quê as quatro correções, e o que elas consertam.** Eu escrevi antes que o
+`sandbox.py` da POC 1 "já é implementação testada". Isso estava errado num ponto
+que importa: ele entrega o **módulo** `re` ao namespace, e o módulo `re` importa
+`enum`, que importa `sys`. Executado contra a versão herdada, em 12/10/2026:
+
+```python
+def corrigir(valor):
+    return str(re.enum.sys.modules["os"].getcwd())
+```
+
+Isso passou pelo portão e devolveu o diretório do projeto. Com `.system(...)` no
+lugar de `getcwd()`, é execução arbitrária de comando na máquina de quem gera.
+A análise de AST não vê nada: a chamada tem `func` como `Attribute`, não como
+`Name`, e nenhum atributo começa com `__`. A premissa "o LLM só tem `re`" é
+falsa — a superfície real é o grafo de atributos de `re`.
+
+Mais dois furos da mesma família, achados na sequência e também confirmados por
+execução: `f = "{0.__class__}".format` seguido de `f(valor)` devolvia
+`<class 'str'>`, porque a proibição só olhava chamada e não leitura; e
+`re.sub = len` **executava**, envenenando o proxy compartilhado, de modo que a
+função materializada depois quebrava. Esse último é o mais grave para a POC, e
+não por ser vazamento: o crivo aprova ou reprova regra **executando-a**, então um
+proxy envenenado faria regras seguintes falharem ou devolverem valor errado, e a
+POC registraria isso como propriedade da regra.
+
+**Este buraco existe na POC 1**, que está publicada em
+`github.com/gustavocamargo1996/AgenteLimpezaDeDados`. Aqui a POC 1 é somente
+leitura, então a correção lá é decisão do usuário.
+
+**Garantia por sondagem, não prova.** Depois das correções, 29 sondas foram
+executadas contra o portão: `re.enum`, `re.functools` e `re.sys` dão
+`AttributeError`; `.format` e `.format_map` são barrados em leitura e em chamada;
+escrita de atributo é barrada; e nada alcançou módulo nem caminho de arquivo.
+Os atributos não-dunder de `Pattern`, de `Match` e dos tipos nativos da allowlist
+foram sondados e não levam a lugar nenhum. Isso é evidência, não demonstração: a
+superfície de um sandbox em processo nunca é provada segura por teste.
+
+**Limite conhecido: sem limite de tempo nem de memória.** `while True: pass`,
+recursão profunda e regex com backtracking catastrófico passam no portão e travam
+a geração. A POC 1 também não tinha. O modelo de ameaça aqui é LLM desastrado,
+não adversário, então é limite declarado, não defeito.
+
+**`corrigir` tem de devolver `str`.** `testar_fumaca` rejeita gerador, `None` e
+lista: a POC 1 checava isso no modo série e a checagem se perdeu ao não portar
+aquele modo. Sem ela, o `repr` de um gerador chegaria à célula.
+
+`re` chega ao namespace como proxy e `pd` fica fora — o que casa com a decisão de
+o LLM escrever só funções escalares.
 
 **O limpador gerado roda sem o portão** na máquina do usuário. O cabeçalho dele
 avisa isso.
+
+---
+
+## O par do guia exige o valor exato {#par-exige-valor-exato}
+
+**O furo.** `_reprovar_reparo` só verificava o par do guia quando o reparo havia
+alterado a célula (`reparada` verdadeiro). Reparo que não tocava o par passava,
+embora "não alterou" signifique exatamente "continua errado na única célula que
+um humano rotulou". Reproduzido: detecção `dominio` marcando as linhas 4 (XX) e 9
+(YY), par `4, estado, XX → MA`, reparo `{"YY": "MA"}`; resultado aprovado.
+
+**A correção.** O piso vale sobre as células de que o reparo é responsável. Na
+coluna-alvo da candidata, vale sempre: toda linha de par que esteja na máscara
+exige `novo == limpo`, sem consultar `reparada`. Em coluna determinante (só na
+`moda_condicionada`), vale somente onde o reparo escreveu, isto é, onde
+`novo` difere do sujo naquela célula; ali o valor escrito tem de ser o `limpo`.
+Razão: a exceção do determinante altera a coluna determinante, mas exigir o par
+dela sem condição reprovaria reparo válido por célula que ele nunca toca (par em
+`cidade`, reparo que só conserta `estado`). O filtro por coluna impede ainda que
+um par de `onca` reprove um reparo de `estado`. Linha de par fora da máscara não
+é verificada: a detecção não a marcou.
+
+**O preço.** Mudança de comportamento: estratégias como `esvaziar` e
+`vizinho_no_dominio`, que não alcançam o valor exato do par, passam a ser
+reprovadas. Troca deliberada de precisão a mais por recall a menos.
 
 ---
 

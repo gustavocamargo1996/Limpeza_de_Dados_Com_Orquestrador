@@ -132,8 +132,8 @@ Quatro dataclasses em `tipos.py`:
 
 | Tipo | Campos |
 |---|---|
-| `Entrada` | `sujo: DataFrame`, `guia_linhas: DataFrame`, `guia_pares: DataFrame`, `perfil: Perfil`, `coluna_sujeito: str` |
-| `Candidata` | `coluna`, `tipo`, `parametros: dict`, `raciocinio: str`, `metricas_crivo: dict` |
+| `Entrada` | `sujo: DataFrame`, `guia_linhas: DataFrame`, `guia_pares: DataFrame`, `perfil: Perfil` (e `coluna_sujeito: str`, pendência da parte 2: ainda não está em `tipos.py`) |
+| `Candidata` | `coluna`, `tipo`, `parametros: dict`, `raciocinio: str`, `metricas: dict` |
 | `Reparo` | `candidata: Candidata`, `estrategia`, `parametros: dict`, `raciocinio: str`, `codigo: str \| None` |
 | `Residual` | `coluna`, `mapa: dict[str, str]`, `justificativas: dict[str, str]` |
 
@@ -144,8 +144,8 @@ par ordenado de colunas).
 
 `motor.py` é a única implementação de "aplicar uma regra". O crivo o importa; o
 codificador copia o texto-fonte dele inteiro para dentro do limpador, porque o
-limpador não pode depender deste repositório. Um teste assevera que o trecho
-embutido é byte a byte igual a `motor.py`.
+limpador não pode depender deste repositório. O teste que assevera que o trecho
+embutido é byte a byte igual a `motor.py` é pendência da parte 2.
 
 Esta é a resposta à lição mais cara da POC 1 (`CLAUDE.md` §4). Não existe uma
 segunda implementação mantida à mão: existem os mesmos bytes em dois lugares,
@@ -162,12 +162,13 @@ Por coluna: número de distintos e de vazios, os 15 valores mais frequentes e os
 frequência (nível 1 classe por caractere, nível 2 classes com contagem de
 repetição, nível 3 sequência de classes sem contagem).
 
-Por par ordenado de colunas `(A, B)`, quatro números calculados só no sujo:
+Por par ordenado de colunas `(A, B)`, cinco números calculados só no sujo:
 
 | Número | Definição |
 |---|---|
 | `det(A→B)` | soma, sobre os grupos de `A` com suporte ≥ 2, da contagem da moda de `B`, dividida pelo total de linhas nesses grupos |
 | `n_grupos` | quantidade de grupos de `A` com suporte ≥ 2 |
+| `cobertura` | fração das linhas da tabela que vivem nesses grupos — é esta, e não a contagem de grupos, que mede a evidência |
 | `n_divergentes` | células de `B` que divergem da moda do seu grupo |
 | `frac_ambiguos` | fração dos grupos em que a moda de `B` não atinge o limiar de dominância |
 
@@ -183,7 +184,7 @@ entidade. Minerar e deixar o LLM julgar, como o Cocoon faz com dependências.
 
 O prompt leva: o schema completo; o perfil compacto daquela coluna, em uma linha
 por item, no estilo do catálogo do CatDB; os pares candidatos em que a coluna é o
-lado determinado, com os quatro números acima; as linhas limpas do guia; e os
+lado determinado, com os cinco números acima; as linhas limpas do guia; e os
 pares `sujo → limpo` que caem naquela coluna.
 
 Devolve candidatas de um **catálogo fechado de cinco tipos**, em ordem de
@@ -309,7 +310,7 @@ casa com o portão da POC 1, que mantém `pd` fora do namespace e oferece `re`.
 
 `preparar_guia.sortear(dataset, semente)` grava, em `dados/guia/<ds>/`:
 
-- `guia_linhas.csv`: 20 linhas sorteadas entre as que estão 100% corretas.
+- `guia_linhas.csv`: até 20 linhas sorteadas entre as que estão 100% corretas (20 é teto: o `beers` tem 5 em 300, e o guia dele ficou com essas cinco).
 - `guia_pares.csv`: colunas `linha, coluna, sujo, limpo`, até 2 pares por coluna
   que tem erro.
 

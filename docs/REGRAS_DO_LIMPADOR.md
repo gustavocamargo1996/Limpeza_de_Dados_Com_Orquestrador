@@ -72,6 +72,26 @@ executado e medido contra o CSV limpo.
 As linhas que aparecem no guia **saem da medição**. Medir nelas mediria o que o
 LLM viu, não o que ele generalizou.
 
+### Quantas linhas o guia tem de verdade
+
+As 20 linhas são o que se pede, não o que sempre se consegue. O guia só aceita
+linhas em que **nenhuma** célula está errada, e há tabelas em que isso é raro.
+Medido nos dois datasets em uso:
+
+| Dataset | Linhas sem erro nenhum, em 300 | Por quê |
+|---|---|---|
+| `environment` | 85 | os erros se espalham por sete colunas, e a maioria das linhas tem um ou dois |
+| `beers` | **5** | a coluna `ounces` está errada em 295 das 300 linhas, então quase toda linha tem ao menos esse erro |
+
+Então o guia do `beers` sai com 5 linhas, não 20. Isso não é defeito: é o que um
+humano também encontraria ao procurar linhas impecáveis numa tabela cuja coluna
+principal está quase toda errada. O efeito prático é que **no `beers` o controle
+negativo é fraco** — cinco linhas vezes onze colunas dão 55 células em que a
+regra não pode mexer. Os outros três testes do crivo não dependem dessas linhas,
+então a proteção não desaparece; ela afina.
+
+O tamanho real do guia é publicado junto de cada número, sempre.
+
 ---
 
 ## 4. Os cinco tipos de erro que o limpador reconhece
@@ -138,18 +158,48 @@ Minerar primeiro, deixar o LLM julgar depois — nunca o contrário. Pedir
 dependências ao LLM só pelos nomes das colunas produz plausibilidade sem
 suporte nos dados; minerar sem o LLM produz coincidências estatísticas.
 
-Para cada par ordenado de colunas, a etapa 1 calcula quatro números **só na
+Para cada par ordenado de colunas, a etapa 1 calcula cinco números **só na
 tabela suja**:
 
 | Número | O que significa |
 |---|---|
 | razão de determinação | de 0 a 1: quanto o valor da coluna determinante prevê o da determinada |
 | número de grupos com suporte | quantos valores da determinante aparecem em pelo menos duas linhas |
+| **cobertura** | que fração das linhas da tabela vive nesses grupos |
 | células divergentes | quantas células da determinada discordam da maioria do seu grupo |
 | fração de grupos ambíguos | em quantos grupos não existe maioria clara |
 
-Só os pares com razão alta e suporte suficiente vão ao LLM, que dá o veredito
+Só os pares com razão alta e cobertura suficiente vão ao LLM, que dá o veredito
 semântico: essa dependência faz sentido no mundo real?
+
+#### A cobertura, e por que não basta contar grupos
+
+Este é o número que separa evidência de coincidência, e errá-lo custou uma volta
+inteira neste projeto. A primeira versão exigia um mínimo de **grupos**, e isso
+rejeita o forte e aceita o fraco:
+
+| Par | Grupos | Linhas cobertas | Ambíguos |
+|---|---|---|---|
+| `City → State` | 9 | 300, a tabela inteira | 0% |
+| `Temperature → Climate_Zone` | 46 | 105, um terço | 41% |
+
+Nove cidades, cada uma aparecendo umas 33 vezes, são a melhor evidência que uma
+tabela de 300 linhas pode dar sobre uma dependência. Quarenta e seis temperaturas
+distintas, cobrindo um terço das linhas e sem maioria clara em 41% dos grupos,
+são ruído. Contar grupos premiava o segundo e barrava o primeiro.
+
+#### Os dois limiares são a mesma afirmação
+
+A razão de determinação tem de passar de **0,70**, e isso não é um número solto:
+é o complemento do teto de marcação de 30% da seção 5. Se o limpador parte do
+princípio de que nenhuma coluna está mais de 30% errada, então uma dependência
+verdadeira não pode falhar em mais de 30% das linhas. A mesma crença, escrita nos
+dois lugares onde ela tem consequência.
+
+Isso também corrige uma perversidade: **a razão de determinação cai justamente
+porque a coluna tem erro.** `City → State` tem razão de 0,82 porque 54 das 300
+células de `State` estão erradas. Um limiar alto rejeitaria exatamente a regra que
+corrigiria esses 54 erros.
 
 #### A fração de grupos ambíguos, e por que ela salva a POC
 
@@ -178,6 +228,31 @@ Uma edição é a troca, a inserção ou a remoção de um caractere, **ou a tro
 lugar entre dois caracteres vizinhos**. Essa última é a mais comum de todas, e
 contá-la como uma edição só é o que faz `Bosotn` ser reconhecido como `Boston` —
 pela conta tradicional ele estaria a duas edições e passaria batido.
+
+#### Duas salvaguardas, e por que cada uma existe
+
+**A primeira protege a chave legítima.** O valor errado tem de aparecer **uma
+única vez** na coluna, e o vizinho tem de aparecer **duas ou mais**. Se `Austin`
+e `Austen` aparecem duas vezes cada, nenhum dos dois é raro, e nenhum é corrigido
+para o outro — porque não há como saber qual é o certo. Sem essa condição, o
+limpador passaria a reescrever valores válidos e frequentes, que é o oposto do
+que ele promete.
+
+**A segunda garante que o resultado não mude entre execuções.** Um valor raro
+pode estar a uma edição de **mais de um** vizinho comum. `Bostn` está a uma
+edição de `Boston` e de `Bostan`. A regra de desempate é:
+
+> entre os vizinhos a uma edição, vence **o mais frequente**; em empate de
+> frequência, vence **o primeiro em ordem alfabética**.
+
+Então com `Boston` três vezes e `Bostan` duas, sai `Boston`, pela frequência.
+Com os dois aparecendo duas vezes, sai `Bostan`, porque `a` vem antes de `o`.
+
+Essa regra parece detalhe e não é. Sem uma ordem total explícita, o desempate
+acabaria decidido pela ordem interna de uma estrutura de dados, que em Python
+muda a cada execução do programa — e a mesma tabela seria limpa de dois jeitos
+em dias diferentes. Para um limpador cujo propósito é ser reexecutável e
+auditável, isso é defeito grave, e passou perto de acontecer.
 
 ---
 

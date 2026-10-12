@@ -168,6 +168,7 @@ Por par ordenado de colunas `(A, B)`, cinco números calculados só no sujo:
 |---|---|
 | `det(A→B)` | soma, sobre os grupos de `A` com suporte ≥ 2, da contagem da moda de `B`, dividida pelo total de linhas nesses grupos |
 | `n_grupos` | quantidade de grupos de `A` com suporte ≥ 2 |
+| `cobertura` | fração das linhas da tabela que vivem nesses grupos — é esta, e não a contagem de grupos, que mede a evidência |
 | `n_divergentes` | células de `B` que divergem da moda do seu grupo |
 | `frac_ambiguos` | fração dos grupos em que a moda de `B` não atinge o limiar de dominância |
 

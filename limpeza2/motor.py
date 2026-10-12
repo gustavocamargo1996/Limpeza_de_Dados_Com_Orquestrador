@@ -121,14 +121,19 @@ def _mais_proximo(valor, dominio, distancia_maxima):
     return melhor
 
 
+def vizinhos_ordenados(frequencia):
+    """Valores com 2+ ocorrencias, do mais frequente ao menos; empate em ordem alfabetica."""
+    # A ordem total faz o reparo ser deterministico, sem depender do hash das strings.
+    ordem = sorted(frequencia.items(), key=lambda par: (-par[1], par[0]))
+    return [v for v, n in ordem if n >= 2]
+
+
 def _reparar_por_moda(novo, original, coluna, determinantes, alvos, dominancia, reparada):
     """Corrige o determinante quando ele e um erro de digitacao, depois usa a moda do grupo."""
     for det in determinantes:
         frequencia = original[det].value_counts()
         raros = {v for v, n in frequencia.items() if n == 1}
-        # Ordem por frequencia e depois alfabetica, para o reparo ser deterministico.
-        ordem = sorted(frequencia.items(), key=lambda par: (-par[1], par[0]))
-        comuns = [v for v, n in ordem if n >= 2]
+        comuns = vizinhos_ordenados(frequencia)
         for linha in alvos:
             valor = original.at[linha, det]
             if valor not in raros:

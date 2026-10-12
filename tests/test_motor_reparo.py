@@ -2,7 +2,7 @@
 import pandas as pd
 import pytest
 
-from limpeza2.motor import distancia_edicao, reparar
+from limpeza2.motor import distancia_edicao, reparar, vizinhos_ordenados
 
 
 @pytest.fixture
@@ -186,3 +186,19 @@ def test_empate_entre_vizinhos_vai_para_o_primeiro_em_ordem_alfabetica():
         verdadeiro_em(df, [4]),
     )
     assert novo.at[4, "cidade"] == "Bostan"
+
+
+def test_vizinhos_ordenados_por_frequencia_e_depois_alfabetica():
+    frequencia = pd.Series(["Boston"] * 3 + ["Bostan"] * 2 + ["Austin"] * 2 + ["Bostn"]).value_counts()
+    assert vizinhos_ordenados(frequencia) == ["Boston", "Austin", "Bostan"]
+
+
+def test_frequencia_vence_a_ordem_alfabetica():
+    df = pd.DataFrame(
+        {"cidade": ["Boston"] * 3 + ["Bostan"] * 2 + ["Bostn"], "estado": ["MA"] * 5 + ["XX"]}
+    )
+    novo, _ = reparar(
+        df, "estado", "moda_condicionada", {"determinantes": ["cidade"]},
+        verdadeiro_em(df, [5]),
+    )
+    assert novo.at[5, "cidade"] == "Boston"

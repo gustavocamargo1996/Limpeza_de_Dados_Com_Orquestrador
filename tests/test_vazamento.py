@@ -22,11 +22,11 @@ def test_nenhum_modulo_importa_os_guardioes(caminho):
     importados = set()
     for no in ast.walk(arvore):
         if isinstance(no, ast.Import):
-            importados.update(alias.name.split(".")[0] for alias in no.names)
+            importados.update(parte for alias in no.names for parte in alias.name.split("."))
         elif isinstance(no, ast.ImportFrom):
             if no.module:
-                importados.add(no.module.split(".")[0])
-            importados.update(alias.name.split(".")[0] for alias in no.names)
+                importados.update(no.module.split("."))
+            importados.update(parte for alias in no.names for parte in alias.name.split("."))
     vazando = importados & GUARDIOES
     assert not vazando, f"{caminho.name} importa {vazando}: o gabarito vazaria para a geracao"
 
@@ -39,8 +39,8 @@ def test_nenhum_modulo_cita_arquivo_csv(caminho):
         for no in ast.walk(arvore)
         if isinstance(no, ast.Constant)
         and isinstance(no.value, str)
-        and no.value.lower().endswith(".csv")
+        and (no.value.lower().endswith(".csv") or no.value in GUARDIOES)
     ]
     assert not literais, (
-        f"{caminho.name} tem literal de CSV em {literais}: o caminho tem de vir por argumento"
+        f"{caminho.name} tem literal proibido em {literais}: CSV vem por argumento e guardiao nao se cita por nome"
     )

@@ -46,10 +46,12 @@ def test_coluna_sem_erro_nao_rende_par(tabelas):
     assert "pais" not in set(pares["coluna"])
 
 
-def test_a_mesma_semente_da_o_mesmo_guia(tabelas):
-    sujo, limpo = tabelas
-    a_linhas, a_pares = sortear(sujo, limpo, semente=7, n_linhas=3, pares_por_coluna=2)
-    b_linhas, b_pares = sortear(sujo, limpo, semente=7, n_linhas=3, pares_por_coluna=2)
+def test_a_mesma_semente_da_o_mesmo_guia():
+    limpo = pd.DataFrame({"v": [str(i) for i in range(60)], "w": ["a"] * 60})
+    sujo = limpo.copy()
+    sujo.loc[:39, "w"] = "b"
+    a_linhas, a_pares = sortear(sujo, limpo, semente=7, n_linhas=5, pares_por_coluna=2)
+    b_linhas, b_pares = sortear(sujo, limpo, semente=7, n_linhas=5, pares_por_coluna=2)
     pd.testing.assert_frame_equal(a_linhas, b_linhas)
     pd.testing.assert_frame_equal(a_pares, b_pares)
 
@@ -58,12 +60,3 @@ def test_pede_mais_linhas_do_que_existe_sem_estourar(tabelas):
     sujo, limpo = tabelas
     linhas, _ = sortear(sujo, limpo, semente=7, n_linhas=99, pares_por_coluna=2)
     assert len(linhas) == 3
-
-
-def test_a_semente_decide_quais_linhas_entram():
-    limpo = pd.DataFrame({"v": [str(i) for i in range(60)]})
-    sujo = limpo.copy()
-    sujo.loc[0, "v"] = "x"
-    a, _ = sortear(sujo, limpo, semente=7, n_linhas=5, pares_por_coluna=2)
-    b, _ = sortear(sujo, limpo, semente=7, n_linhas=5, pares_por_coluna=2)
-    assert list(a.index) == list(b.index)

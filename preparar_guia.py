@@ -1,6 +1,5 @@
 """Sorteia o guia com semente fixa: linhas certas e pares sujo->limpo."""
 import argparse
-from pathlib import Path
 
 import pandas as pd
 
@@ -41,7 +40,7 @@ def sortear(sujo, limpo, semente, n_linhas, pares_por_coluna):
 
 
 def gravar(dataset, sujo, limpo):
-    """Grava os dois CSVs do guia em dados/guia/<dataset>/ e devolve os caminhos."""
+    """Grava os CSVs do guia em dados/guia/<dataset>/ e devolve caminhos e contagens."""
     linhas, pares = sortear(
         sujo, limpo, config.SEMENTE, config.LINHAS_GUIA, config.PARES_POR_COLUNA
     )
@@ -51,7 +50,7 @@ def gravar(dataset, sujo, limpo):
     caminho_pares = destino / "guia_pares.csv"
     linhas.to_csv(caminho_linhas, index=True, index_label="_linha", encoding="utf-8")
     pares.to_csv(caminho_pares, index=False, encoding="utf-8")
-    return caminho_linhas, caminho_pares
+    return caminho_linhas, caminho_pares, len(linhas), len(pares)
 
 
 def main():
@@ -63,11 +62,10 @@ def main():
 
     sujo = pd.read_csv(args.sujo, **config.LER_CSV)
     limpo = pd.read_csv(args.limpo, **config.LER_CSV)
-    linhas, pares = gravar(args.dataset, sujo, limpo)
-    print(f"guia de {args.dataset}: {len(pd.read_csv(linhas))} linhas, "
-          f"{len(pd.read_csv(pares))} pares")
-    print(f"  {linhas}")
-    print(f"  {pares}")
+    caminho_linhas, caminho_pares, n_linhas, n_pares = gravar(args.dataset, sujo, limpo)
+    print(f"guia de {args.dataset}: {n_linhas} linhas, {n_pares} pares")
+    print(f"  {caminho_linhas}")
+    print(f"  {caminho_pares}")
     return 0
 
 

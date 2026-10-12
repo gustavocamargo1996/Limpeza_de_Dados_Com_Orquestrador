@@ -64,3 +64,17 @@ def test_dependencia_pula_grupo_de_uma_linha():
 def test_tipo_desconhecido_falha_alto(tabela):
     with pytest.raises(ValueError, match="desconhecido"):
         detectar(tabela, "onca", "telepatia", {})
+
+
+def test_moda_de_grupo_de_uma_linha_e_none():
+    from limpeza2.motor import moda_dominante
+    assert moda_dominante(pd.Series(["x"]), 0.70) is None
+
+
+def test_dependencia_aceita_dominancia_exata():
+    from limpeza2.motor import moda_dominante
+    serie = pd.Series(["10:30"] * 7 + ["10:31"] * 3)
+    assert moda_dominante(serie, 0.70) == "10:30"
+    df = pd.DataFrame({"voo": ["AA1"] * 10, "hora": list(serie)})
+    m = detectar(df, "hora", "dependencia", {"determinantes": ["voo"]}, dominancia=0.70)
+    assert list(m) == [False] * 7 + [True] * 3

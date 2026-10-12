@@ -6,6 +6,8 @@ TIPOS = ("formato", "dominio", "faixa", "ausente_disfarcado", "dependencia")
 
 def detectar(df, coluna, tipo, parametros, dominancia=0.70):
     """Devolve a mascara booleana das celulas que a regra considera erradas."""
+    if tipo == "dependencia":
+        return divergentes_da_moda(df, parametros["determinantes"], coluna, dominancia)
     serie = df[coluna].astype(str)
     if tipo == "formato":
         return ~serie.str.fullmatch(parametros["regex"], na=False)
@@ -13,12 +15,11 @@ def detectar(df, coluna, tipo, parametros, dominancia=0.70):
         return ~serie.isin(parametros["valores"])
     if tipo == "faixa":
         numeros = pd.to_numeric(serie, errors="coerce")
+        # Comparacao com NaN ja devolve False, entao o que nao e numero nunca entra.
         fora = (numeros < parametros["minimo"]) | (numeros > parametros["maximo"])
-        return numeros.notna() & fora
+        return fora
     if tipo == "ausente_disfarcado":
         return serie.isin(parametros["sentinelas"])
-    if tipo == "dependencia":
-        return divergentes_da_moda(df, parametros["determinantes"], coluna, dominancia)
     raise ValueError(f"tipo de regra desconhecido: {tipo}")
 
 

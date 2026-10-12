@@ -34,8 +34,13 @@ def test_aceita_flag_de_re():
         ('def corrigir(valor):\n    return setattr(valor, "a", 1)\n', "chamada proibida: setattr"),
         ('def corrigir(valor):\n    return globals()\n', "chamada proibida: globals"),
         ('def corrigir(valor):\n    return input()\n', "chamada proibida: input"),
-        ('def corrigir(valor):\n    return "{0.__class__}".format(valor)\n', r"chamada proibida: \.format"),
-        ('def corrigir(valor):\n    return "{0.__class__}".format_map({})\n', r"chamada proibida: \.format_map"),
+        ('def corrigir(valor):\n    return "{0.__class__}".format(valor)\n', r"metodo proibido: \.format"),
+        ('def corrigir(valor):\n    return "{0.__class__}".format_map({})\n', r"metodo proibido: \.format_map"),
+        ('def corrigir(valor):\n    f = "{0.__class__}".format\n    return f(valor)\n', r"metodo proibido: \.format"),
+        ('def corrigir(valor):\n    return str(list(map("{0.__class__}".format, [valor])))\n', r"metodo proibido: \.format"),
+        ('def corrigir(valor):\n    f = "{a}".format_map\n    return f({})\n', r"metodo proibido: \.format_map"),
+        ('def corrigir(valor):\n    re.sub = len\n    return valor\n', "escrita de atributo proibida"),
+        ('def corrigir(valor):\n    del re.sub\n    return valor\n', "escrita de atributo proibida"),
         ('def corrigir(valor):\n    return valor.__class__\n', "dunder"),
         ('def corrigir(valor):\n    return __import__("os")\n', "__import__"),
         ('def limpar(valor):\n    return valor\n', "corrigir"),
@@ -50,6 +55,11 @@ def test_aceita_flag_de_re():
 def test_rejeita_codigo_proibido(codigo, trecho):
     with pytest.raises(CodigoRejeitado, match=trecho):
         validar(codigo)
+
+
+def test_materializacoes_nao_compartilham_o_proxy_de_re():
+    a, b = materializar(VALIDA), materializar(VALIDA)
+    assert a.__globals__["re"] is not b.__globals__["re"]
 
 
 def test_rejeita_sem_executar(monkeypatch):

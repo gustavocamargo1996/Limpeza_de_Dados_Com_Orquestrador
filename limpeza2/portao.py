@@ -26,13 +26,11 @@ _BUILTINS_PERMITIDOS = {
 }
 
 # O modulo re inteiro vazaria sys e functools por re.enum.sys; so este recorte entra.
-_RE_PERMITIDO = SimpleNamespace(**{
-    nome: getattr(re, nome) for nome in (
-        "sub", "subn", "search", "match", "fullmatch", "findall", "finditer",
-        "split", "escape", "compile", "I", "IGNORECASE", "M", "MULTILINE",
-        "S", "DOTALL", "X", "VERBOSE", "A", "ASCII",
-    )
-})
+_NOMES_RE_PERMITIDOS = (
+    "sub", "subn", "search", "match", "fullmatch", "findall", "finditer",
+    "split", "escape", "compile", "I", "IGNORECASE", "M", "MULTILINE",
+    "S", "DOTALL", "X", "VERBOSE", "A", "ASCII",
+)
 
 _METODOS_PROIBIDOS = {"format", "format_map"}
 
@@ -73,9 +71,10 @@ def validar(codigo, nome_funcao=NOME_FUNCAO, nome_argumento=NOME_ARGUMENTO):
         if isinstance(no, ast.Call) and isinstance(no.func, ast.Name):
             if no.func.id in _CHAMADAS_PROIBIDAS:
                 raise CodigoRejeitado(f"chamada proibida: {no.func.id}()")
-        if isinstance(no, ast.Call) and isinstance(no.func, ast.Attribute):
-            if no.func.attr in _METODOS_PROIBIDOS:
-                raise CodigoRejeitado(f"chamada proibida: .{no.func.attr}()")
+        if isinstance(no, ast.Attribute) and no.attr in _METODOS_PROIBIDOS:
+            raise CodigoRejeitado(f"metodo proibido: .{no.attr}")
+        if isinstance(no, ast.Attribute) and not isinstance(no.ctx, ast.Load):
+            raise CodigoRejeitado(f"escrita de atributo proibida: .{no.attr}")
         if isinstance(no, ast.Attribute) and no.attr.startswith("__"):
             raise CodigoRejeitado(f"acesso a atributo dunder proibido: {no.attr}")
 
@@ -84,7 +83,9 @@ def materializar(codigo, nome_funcao=NOME_FUNCAO, nome_argumento=NOME_ARGUMENTO)
     """Valida e devolve a funcao viva; nao materializa o que `validar` rejeitar."""
     validar(codigo, nome_funcao=nome_funcao, nome_argumento=nome_argumento)
     # pandas fica fora do namespace: o LLM so escreve funcao escalar.
-    namespace = {"re": _RE_PERMITIDO, "__builtins__": dict(_BUILTINS_PERMITIDOS)}
+    # Cada materializacao tem o seu proxy de re: escrita nao atravessa funcoes.
+    proxy_re = SimpleNamespace(**{nome: getattr(re, nome) for nome in _NOMES_RE_PERMITIDOS})
+    namespace = {"re": proxy_re, "__builtins__": dict(_BUILTINS_PERMITIDOS)}
     exec(compile(codigo, "<regra-gerada>", "exec"), namespace, namespace)
     funcao = namespace.get(nome_funcao)
     if not callable(funcao):

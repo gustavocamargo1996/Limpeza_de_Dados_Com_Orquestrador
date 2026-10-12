@@ -289,7 +289,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `limpeza2.config.{SEMENTE, LINHAS_GUIA, PARES_POR_COLUNA, LER_CSV, GUIA, DATASETS}`.
-- Produces: `preparar_guia.sortear(sujo: DataFrame, limpo: DataFrame, semente: int, n_linhas: int, pares_por_coluna: int) -> tuple[DataFrame, DataFrame]`. O segundo DataFrame tem as colunas `linha, coluna, sujo, limpo`. `preparar_guia.gravar(dataset: str, sujo, limpo) -> tuple[Path, Path]`.
+- Produces: `preparar_guia.sortear(sujo: DataFrame, limpo: DataFrame, semente: int, n_linhas: int, pares_por_coluna: int) -> tuple[DataFrame, DataFrame]`. O segundo DataFrame tem as colunas `linha, coluna, sujo, limpo`. `preparar_guia.gravar(dataset: str, sujo, limpo) -> tuple[Path, Path, int, int]`, devolvendo os dois caminhos mais a contagem de linhas e de pares — as contagens existem para o `main` não precisar reler os CSVs que acabou de gravar.
 
 - [ ] **Step 1: Escrever os testes, que vão falhar**
 

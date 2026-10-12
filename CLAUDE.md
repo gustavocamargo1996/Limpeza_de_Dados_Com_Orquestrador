@@ -60,6 +60,14 @@ dois artefatos, com donos e momentos diferentes:
 | Quem produz, num caso real | um humano que abre o dataset e, por inspeção visual, separa algumas linhas certas e alguns erros grosseiros com a correção | já existe (benchmark) ou é construído à parte |
 | Para que serve | um few-shot: mostrar ao LLM o schema, o formato de cada campo, o relacionamento entre campos e exemplos de erro | medir se o limpador é bom |
 
+As 20 linhas são um **teto, não uma garantia**. Medido em 12/10/2026: o
+`beers_dirty_300` tem apenas **5 linhas sem nenhum erro**, porque a coluna
+`ounces` está errada em 295 das 300 linhas; o `environment_dirty_300` tem 85.
+Onde não houver 20 linhas totalmente limpas, o guia sai menor, e o tamanho real
+dele é reportado ao lado de cada número. A consequência é que no `beers` o
+controle negativo fica fraco — 5 linhas vezes 11 colunas, 55 células — e isso
+precisa ser dito ao reportar o resultado desse dataset.
+
 **O gabarito nunca é lido pela geração**, nem para amostrar, nem para validar
 regra, nem para escolher parâmetro. A geração lê o sujo e o guia, e só. Se o
 gabarito vazar para a geração, a POC mede memorização e todo número publicado

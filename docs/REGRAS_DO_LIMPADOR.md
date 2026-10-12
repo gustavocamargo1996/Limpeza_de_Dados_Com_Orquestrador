@@ -72,6 +72,26 @@ executado e medido contra o CSV limpo.
 As linhas que aparecem no guia **saem da medição**. Medir nelas mediria o que o
 LLM viu, não o que ele generalizou.
 
+### Quantas linhas o guia tem de verdade
+
+As 20 linhas são o que se pede, não o que sempre se consegue. O guia só aceita
+linhas em que **nenhuma** célula está errada, e há tabelas em que isso é raro.
+Medido nos dois datasets em uso:
+
+| Dataset | Linhas sem erro nenhum, em 300 | Por quê |
+|---|---|---|
+| `environment` | 85 | os erros se espalham por sete colunas, e a maioria das linhas tem um ou dois |
+| `beers` | **5** | a coluna `ounces` está errada em 295 das 300 linhas, então quase toda linha tem ao menos esse erro |
+
+Então o guia do `beers` sai com 5 linhas, não 20. Isso não é defeito: é o que um
+humano também encontraria ao procurar linhas impecáveis numa tabela cuja coluna
+principal está quase toda errada. O efeito prático é que **no `beers` o controle
+negativo é fraco** — cinco linhas vezes onze colunas dão 55 células em que a
+regra não pode mexer. Os outros três testes do crivo não dependem dessas linhas,
+então a proteção não desaparece; ela afina.
+
+O tamanho real do guia é publicado junto de cada número, sempre.
+
 ---
 
 ## 4. Os cinco tipos de erro que o limpador reconhece

@@ -1739,12 +1739,17 @@ def _ler_guia(caminho_guia, colunas):
     pasta = Path(caminho_guia)
     arquivo_linhas = pasta / "guia_linhas.csv"
     arquivo_pares = pasta / "guia_pares.csv"
-    linhas = (
-        pd.read_csv(arquivo_linhas, index_col="_linha", **config.LER_CSV)
-        if arquivo_linhas.exists()
-        else pd.DataFrame(columns=list(colunas))
-    )
-    pares = pd.read_csv(arquivo_pares, **config.LER_CSV) if arquivo_pares.exists() else vazio_pares
+    linhas = pd.DataFrame(columns=list(colunas))
+    if arquivo_linhas.exists():
+        linhas = pd.read_csv(arquivo_linhas, index_col="_linha", **config.LER_CSV)
+        # LER_CSV faz o indice virar texto, e o indice do sujo e inteiro;
+        # sem esta conversao o intersection do crivo daria vazio em silencio.
+        linhas.index = linhas.index.astype(int)
+    pares = vazio_pares
+    if arquivo_pares.exists():
+        pares = pd.read_csv(arquivo_pares, **config.LER_CSV)
+        if not pares.empty:
+            pares["linha"] = pares["linha"].astype(int)
     return linhas, pares
 ```
 

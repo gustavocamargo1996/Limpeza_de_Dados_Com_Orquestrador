@@ -135,16 +135,22 @@ renomeada antes de rodar o limpador.
 
 ---
 
-## O guia é sorteado, e o gabarito tem um único guardião {#guia-sorteado}
+## O guia é sorteado, e o CSV limpo tem dois guardiões declarados {#guia-sorteado}
 
-**Decisão.** `gabarito.py` é o único módulo que abre o CSV limpo, e fica fora do
-pacote `limpeza2/`. Ele faz duas coisas: sortear o guia com semente fixa e medir
-o limpador.
+**Decisão.** `preparar_guia.py` (sorteia o guia com semente fixa) e `medir.py`
+(executa o limpador e calcula as métricas) são os únicos módulos que abrem o CSV
+limpo, e os dois ficam fora do pacote `limpeza2/`.
+
+**Por que dois e não um.** Eram um só, chamado `gabarito.py`. Mas sortear o guia
+e medir o limpador não se chamam entre si, rodam em momentos diferentes e têm
+entradas diferentes: o que compartilhavam era só o arquivo que abrem. Agrupar
+pelo recurso em vez de pela função é a fronteira fraca que o `CLAUDE.md` §2
+manda evitar.
 
 **Por quê.** Transforma a regra "o gabarito nunca é lido pela geração" num
 invariante verificável por import, em vez de uma convenção que depende de
 disciplina. O teste de vazamento fica trivial: nenhum módulo de `limpeza2/`
-importa `gabarito`.
+importa nenhum dos dois.
 
 **Sobre o sorteio.** Decisão do usuário: 20 linhas sorteadas entre as que estão
 100% corretas, e até 2 pares `sujo → limpo` por coluna que tem erro. A cota por

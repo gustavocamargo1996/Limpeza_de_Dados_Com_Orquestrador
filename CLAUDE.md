@@ -222,26 +222,28 @@ linguagem de usuário em `docs/REGRAS_DO_LIMPADOR.md`.
 limpeza2/
   tipos.py              # o que viaja entre etapas
   config.py             # modelo, caminhos, limiares, semente
-  provedor.py           # cliente de LLM; PROVEDOR desconhecido falha alto
-  portao.py             # AST com allowlist + namespace descartavel
+  provedor.py           # entrega o cliente do provedor de LLM escolhido
+  portao.py             # valida o Python gerado antes de deixa-lo rodar
   motor.py              # UNICA implementacao de aplicacao de regra
-  e1_perfil.py          # etapa 1: carga literal + perfil por coluna e por par
+  e1_perfil.py          # etapa 1: perfila a tabela suja, lida como texto literal
   e2_detector.py        # etapa 2: agente detector -> predicados candidatos
-  e3_crivo.py           # etapa 3: portao deterministico, sem LLM e sem gabarito
+  e3_crivo.py           # etapa 3: reprova a regra candidata que nao se sustenta
   e4_especificador.py   # etapa 4: agente especificador -> JSON de reparo
   e5_residual.py        # etapa 5: rodada residual por entidade -> dicionario
-  e6_codificador.py     # etapa 6: agente codificador -> escreve limpador e raciocinio
+  e6_codificador.py     # etapa 6: agente codificador -> escreve os artefatos de saida
   espinha.py            # a ordem das etapas, e nada mais
-gabarito.py             # fora do pacote: o UNICO modulo que abre o CSV limpo
+preparar_guia.py        # fora do pacote: sorteia o guia com semente fixa
+medir.py                # fora do pacote: executa o limpador gerado e mede
 ```
 
-Treze arquivos, cada um com uma função que cabe numa frase. A seção 2 admite até
+Quatorze arquivos, cada um com uma função que cabe numa frase. A seção 2 admite até
 quinze, e a folga é para quando `e6_codificador.py` ou `motor.py` passarem de 200
 linhas: aí separa-se a parte que tem função própria, nunca se fraciona pelo
 tamanho.
 
-`gabarito.py` fora do pacote é o que torna o §1 verificável: nenhum módulo de
-`limpeza2/` importa `gabarito`, e o teste de vazamento assevera isso.
+Os dois módulos fora do pacote são os únicos que abrem o CSV limpo, e é isso que
+torna o §1 verificável: nenhum módulo de `limpeza2/` importa `preparar_guia` nem
+`medir`, e o teste de vazamento assevera isso.
 
 ### A espinha
 
@@ -259,7 +261,7 @@ def gerar_limpador(caminho_sujo, caminho_guia, destino):
 
 O crivo aparece duas vezes porque o controle negativo do guia vale para a regra
 que detecta e para a que repara. A validação não está na espinha: é a outra
-fase, `gabarito.medir(...)`.
+fase, `medir.medir(...)`.
 
 ### Tipos que viajam (`tipos.py`)
 

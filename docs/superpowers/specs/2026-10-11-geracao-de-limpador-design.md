@@ -47,10 +47,11 @@ detector e especificador juntos ocupam o lugar do gerador de prompt.
 | Geração | `<ds>_dirty_300.csv` e, opcionalmente, `guia_linhas.csv` + `guia_pares.csv` | `limpador_<ds>_<carimbo>.py` e `raciocinio_<ds>_<carimbo>.md` |
 | Validação | o limpador gerado, o sujo e `<ds>_clean*.csv` | precisão, recall, F1, flags e decomposição por fonte |
 
-**O CSV limpo nunca é lido pela geração.** Garantia estrutural: `gabarito.py` é o
-único módulo do projeto que o abre, e ele fica fora do pacote `limpeza2/`. O
-teste de vazamento assevera que nenhum módulo de `limpeza2/` importa `gabarito` e
-que nenhum abre caminho de arquivo que não seja o sujo ou os dois CSVs do guia.
+**O CSV limpo nunca é lido pela geração.** Garantia estrutural: `preparar_guia.py`
+e `medir.py` são os únicos módulos do projeto que o abrem, e os dois ficam fora do
+pacote `limpeza2/`. O teste de vazamento assevera que nenhum módulo de
+`limpeza2/` importa nenhum dos dois, e que nenhum abre caminho de arquivo que não
+seja o sujo ou os dois CSVs do guia.
 
 **Os arquivos de restrição do benchmark** (`FunctionalDependency.txt`,
 `TypeConstraint.txt`) e o `real_examples.txt` **não são lidos em nenhuma fase**.
@@ -80,20 +81,21 @@ Depois, como generalização entre datasets: `hospital`, `flights` e `rayyan`.
 limpeza2/
   tipos.py              # o que viaja entre etapas
   config.py             # modelo, caminhos, limiares, semente
-  provedor.py           # cliente de LLM; PROVEDOR desconhecido falha alto
-  portao.py             # AST com allowlist + namespace descartavel
+  provedor.py           # entrega o cliente do provedor de LLM escolhido
+  portao.py             # valida o Python gerado antes de deixa-lo rodar
   motor.py              # UNICA implementacao de aplicacao de regra
-  e1_perfil.py          # etapa 1: carga literal + perfil por coluna e por par
+  e1_perfil.py          # etapa 1: perfila a tabela suja, lida como texto literal
   e2_detector.py        # etapa 2: agente detector -> predicados candidatos
-  e3_crivo.py           # etapa 3: portao deterministico, sem LLM e sem gabarito
+  e3_crivo.py           # etapa 3: reprova a regra candidata que nao se sustenta
   e4_especificador.py   # etapa 4: agente especificador -> JSON de reparo
   e5_residual.py        # etapa 5: rodada residual por entidade -> dicionario
-  e6_codificador.py     # etapa 6: agente codificador -> escreve limpador e raciocinio
+  e6_codificador.py     # etapa 6: agente codificador -> escreve os artefatos de saida
   espinha.py            # a ordem das etapas, e nada mais
-gabarito.py             # fora do pacote: o UNICO modulo que abre o CSV limpo
+preparar_guia.py        # fora do pacote: sorteia o guia com semente fixa
+medir.py                # fora do pacote: executa o limpador gerado e mede
 ```
 
-Treze arquivos. O `CLAUDE.md` §2 admite até quinze, com necessidade demonstrada,
+Quatorze arquivos. O `CLAUDE.md` §2 admite até quinze, com necessidade demonstrada,
 e o critério que manda é outro: **todo arquivo cabe numa frase que diz o que ele
 faz**. A folga de dois existe para quando `e6_codificador.py` ou `motor.py`
 passarem de 200 linhas — aí separa-se a parte que tem função própria. Fracionar
@@ -122,7 +124,7 @@ do guia vale tanto para a regra que detecta quanto para a que repara. É o que
 justifica ele ser módulo próprio.
 
 A validação não está na espinha, porque é a outra fase:
-`gabarito.medir(caminho_limpador, sujo, limpo, guia)`.
+`medir.medir(caminho_limpador, sujo, limpo, guia)`.
 
 ### 5.3 Tipos que viajam
 
@@ -300,7 +302,7 @@ casa com o portão da POC 1, que mantém `pd` fora do namespace e oferece `re`.
 
 ## 7. Guia
 
-`gabarito.sortear_guia(dataset, semente)` grava, em `dados/guia/<ds>/`:
+`preparar_guia.sortear(dataset, semente)` grava, em `dados/guia/<ds>/`:
 
 - `guia_linhas.csv`: 20 linhas sorteadas entre as que estão 100% corretas.
 - `guia_pares.csv`: colunas `linha, coluna, sujo, limpo`, até 2 pares por coluna
@@ -363,8 +365,8 @@ provedor que devolve JSON fixo.
 
 Um teste por etapa, mais quatro que são rede de segurança:
 
-1. **Vazamento**: nenhum módulo de `limpeza2/` importa `gabarito`; nenhum abre
-   caminho de arquivo fora do sujo e dos dois CSVs do guia.
+1. **Vazamento**: nenhum módulo de `limpeza2/` importa `preparar_guia` nem
+   `medir`; nenhum abre caminho de arquivo fora do sujo e dos dois CSVs do guia.
 2. **Portão**: código com `import`, dunder, `eval` e `open` é rejeitado sem ser
    executado.
 3. **Identidade do motor**: o trecho embutido no limpador é byte a byte igual a

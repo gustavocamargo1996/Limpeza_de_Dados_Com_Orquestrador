@@ -225,9 +225,9 @@ Executa cada candidata sobre o sujo pelo `motor.py` e aplica cinco testes:
 
 Entre as variantes sobreviventes do mesmo tipo fica a de **menor taxa de
 marcação** que ainda passa no teste 4. Tipos diferentes na mesma coluna
-coexistem, mas a união das máscaras tem de caber no teto da coluna: se estourar,
-descartam-se tipos, do de maior taxa para o de menor (empate: ordem alfabética
-do tipo), até caber (`uniao_acima_do_teto`).
+coexistem, e a taxa da união das máscaras vai a `metricas` (`taxa_uniao`) como
+informação, não como critério: o portão `uniao_acima_do_teto` foi removido
+(ver `docs/DECISOES.md#teto-de-marcacao`).
 
 Em coluna sem par no guia, o teste 4 não se aplica, e os testes 1 a 3 decidem
 sozinhos. Marcar célula do guia em que `sujo != guia` é correto e não reprova. É isso que substitui o gate de 100% da POC 1, que passava por

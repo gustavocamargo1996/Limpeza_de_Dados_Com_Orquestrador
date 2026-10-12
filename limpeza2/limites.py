@@ -1,8 +1,6 @@
 """Calcula os limites que o guia sustenta para uma coluna, sem olhar a candidata."""
 from math import sqrt
 
-import pandas as pd
-
 from limpeza2 import config
 
 
@@ -22,11 +20,6 @@ def valores_certificados(entrada, coluna):
     if coluna not in entrada.guia_linhas.columns:
         return set()
     return set(entrada.guia_linhas[coluna])
-
-
-def taxa_da_uniao(mascaras):
-    """A fracao de celulas marcadas por ao menos uma das mascaras."""
-    return float(pd.concat(mascaras, axis=1).any(axis=1).mean())
 
 
 def celulas_sujas_do_guia(entrada, coluna):

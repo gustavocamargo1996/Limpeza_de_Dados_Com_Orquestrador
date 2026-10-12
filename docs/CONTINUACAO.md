@@ -8,7 +8,7 @@ resumida. Leia junto com o `CLAUDE.md` e o `docs/DECISOES.md`.
 ## 1. O que existe e está em `main`
 
 A **fundação determinística** da POC 2, mesclada em `main`, com 174 testes
-passando e saída limpa. Dez arquivos `.py` fora de `tests/`, 911 linhas, maior
+passando e saída limpa (hoje 186 após as duas mudanças da seção 3 e 4). Onze arquivos `.py` fora de `tests/`, 940 linhas, maior
 com 179.
 
 | Arquivo | Função |
@@ -45,7 +45,7 @@ dataset. Vale 220 células rotuladas, usadas como **oráculo de correção**:
   `guia_receita.txt`. Isso permite medir a curva de supervisão contra recall:
   rodar sem guia, com 10, 20 e 40 linhas.
 
-## 3. A DECISÃO PENDENTE, e é a mais importante — conformidade de schema
+## 3. Conformidade de schema (IMPLEMENTADA)
 
 **O problema que o usuário identificou, e ele estava certo.** Eu construí um
 único juiz para todo tipo de erro e o calibrei com um teto estatístico de
@@ -92,7 +92,16 @@ duas letras válidas. São exatamente as colunas que precisam de dependência
 funcional, e a abstenção é o sinal de roteamento: schema apertado com zero
 violação significa que, se há erro, ele é contextual.
 
-### O desenho aprovado pelo usuário, a implementar
+### O desenho aprovado pelo usuário, implementado
+
+Implementado em `limpeza2/conformidade.py` (`schema_da_coluna`,
+`candidatas_de_conformidade`), no tipo `conformidade` de `motor.py` (com `padrao`
+movida para lá) e na exceção do teto em `e3_crivo.py`. Âncora:
+`docs/DECISOES.md#conformidade-de-schema`. A espinha ainda não existe: a parte 2
+chama `candidatas_de_conformidade` antes do crivo. Reproduziu todos os números
+da tabela acima. Atenção: coluna sem erro e de largura variável (`index`, `id`,
+`brewery_id`, `PM2.5`) tem schema e é marcada com precisão 0,000 (9 a 15
+células), e o crivo a aprova.
 
 Uma etapa **determinística antes do detector**, no espírito do CatDB:
 
@@ -118,9 +127,9 @@ Três decisões de desenho que ficaram em aberto e que eu tomaria assim: a etapa
 mora em módulo próprio (`limpeza2/conformidade.py`); o corte é um terço das
 amostras; e ela **não** propõe a correção, só detecta.
 
-## 4. O OUTRO PENDENTE — tirar o portão da união
+## 4. O portão da união (REMOVIDO)
 
-Decidido com o usuário e **ainda não implementado**. Em `e3_crivo`, quando a
+Decidido com o usuário e **implementado**: o portão saiu, `taxa_da_uniao` mudou de `limites.py` para `e3_crivo.py` e cada regra que sobrevive guarda `taxa_uniao` em `metricas`. Em `e3_crivo`, quando a
 união das máscaras de uma coluna estoura o teto, hoje descarta-se o tipo de maior
 taxa. Isso **descarta a regra boa**: ela marca mais justamente porque acha todos
 os erros.
@@ -167,8 +176,6 @@ aparece.
 - O piso de detecção **não** inclui as células sujas do guia, de propósito:
   exigiria que a regra marcasse todas e rejeitaria regra que pega corretamente só
   um dos tipos de erro da coluna.
-- `taxa_da_uniao` está em `limites.py` mas não consulta a `Entrada` — fronteira
-  vazando, mover para o crivo.
 - A conta `sujo != guia` nas linhas do guia está escrita três vezes.
 - A docstring de `_reprovar` diz "cinco testes" e há sete motivos.
 - `valores_certificados` ignora os `limpo` de `guia_pares.csv` fora das 20 linhas.
@@ -179,18 +186,19 @@ aparece.
 
 ## 7. O que vem depois, em ordem
 
-1. **A conformidade de schema** (seção 3) e **a remoção do portão da união**
-   (seção 4). As duas foram aprovadas pelo usuário.
-2. **A parte 2:** `provedor.py`, `e2_detector.py`, `e4_especificador.py`,
+1. **A parte 2:** `provedor.py`, `e2_detector.py`, `e4_especificador.py`,
    `e5_residual.py`, `e6_codificador.py`, `espinha.py`. Seis arquivos, teto de 16.
-3. Duas recomendações da revisão final para a parte 2: o teste de vazamento **em
+2. Duas recomendações da revisão final para a parte 2: o teste de vazamento **em
    tempo de execução**, instrumentando `pandas.read_csv` e exigindo que todo
    caminho aberto seja o sujo ou o guia; e o codificador deve **ler `motor.py` do
    disco** e concatenar, nunca guardar template com o texto do motor dentro, para
    a identidade byte a byte ser verdadeira por construção.
-4. O primeiro run pago. **Nenhuma chamada de API foi feita nesta sessão.**
+3. O primeiro run pago. **Nenhuma chamada de API foi feita nesta sessão.**
    Estimativa: cerca de 60 chamadas por dataset por braço, com `gpt-5.6-luna`.
    Anunciar antes.
+4. A espinha deve chamar `candidatas_de_conformidade` e entregar as candidatas ao
+   crivo junto com as do detector; o detector só é chamado para as colunas sem
+   schema. Decidir o que fazer com coluna de schema sem erro (precisão 0,000).
 
 ## 8. Como o usuário trabalha
 

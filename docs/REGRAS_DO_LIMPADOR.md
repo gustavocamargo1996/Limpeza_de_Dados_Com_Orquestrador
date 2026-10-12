@@ -331,9 +331,10 @@ Duas salvaguardas completam o crivo. O **veto por valor certificado**
 `ausente_disfarcado` que marca célula cujo valor o guia mostra como correto na
 coluna se contradiz, e é reprovada (`dependencia` fica de fora, porque o erro está
 no contexto da linha). É ele que impede a regra degenerada em `ounces`, onde o
-teto passa de 1. E a **união por coluna**: os cinco tipos coexistem, mas a união
-das máscaras tem de caber no teto da coluna; se estourar, descartam-se tipos,
-do de maior taxa ao de menor, até caber. Detalhes em `docs/DECISOES.md#teto-de-marcacao`.
+teto passa de 1. Os tipos da mesma coluna coexistem, e o crivo grava a **taxa da
+união** das máscaras como número para o relatório de raciocínio, não como
+critério: um portão por união chegou a descartar a regra boa e manter a ruim.
+Detalhes em `docs/DECISOES.md#teto-de-marcacao`.
 
 ### Sobre o teto de marcação
 

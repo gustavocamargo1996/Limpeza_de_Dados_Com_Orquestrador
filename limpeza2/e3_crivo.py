@@ -3,20 +3,20 @@ import pandas as pd
 
 from limpeza2 import config
 from limpeza2.limites import (
-    celulas_sujas_do_guia, taxa_da_uniao, teto_da_coluna, valores_certificados,
+    celulas_sujas_do_guia, teto_da_coluna, valores_certificados,
 )
 from limpeza2.motor import detectar, reparar
 
 MOTIVOS = (
     "aprovada", "marca_celula_correta", "vacua", "marca_demais", "perde_par_do_guia",
     "ambigua", "sem_perfil", "lancou", "nao_repara", "corrompe_celula_do_guia",
-    "marca_valor_certificado", "uniao_acima_do_teto",
+    "marca_valor_certificado",
 )
 TIPOS_DE_VALOR = ("formato", "dominio", "faixa", "ausente_disfarcado", "conformidade")
 
 
 def crivar_deteccao(candidatas, entrada):
-    """Crivo da deteccao: menor taxa por (coluna, tipo), e a uniao por coluna cabe no teto."""
+    """Crivo da deteccao: menor taxa por (coluna, tipo); a taxa da uniao vai a metricas."""
     vencedoras = {}
     for candidata in candidatas:
         mascara = _mascara(candidata, entrada)
@@ -27,21 +27,16 @@ def crivar_deteccao(candidatas, entrada):
         if anterior is None or candidata.metricas["taxa"] < anterior[0].metricas["taxa"]:
             vencedoras[chave] = (candidata, mascara)
     for coluna in {c for c, _ in vencedoras}:
-        _limitar_uniao(coluna, [v for (c, _), v in vencedoras.items() if c == coluna])
-    finais = {id(c) for c, _ in vencedoras.values() if c.metricas["motivo"] == "aprovada"}
+        _gravar_uniao([v for (c, _), v in vencedoras.items() if c == coluna])
+    finais = {id(c) for c, _ in vencedoras.values()}
     return [c for c in candidatas if id(c) in finais]
 
 
-def _limitar_uniao(coluna, vencedoras):
-    """Descarta, da maior taxa para a menor, os tipos ate a uniao das mascaras caber no teto."""
-    # Empate de taxa: o nome do tipo em ordem alfabetica decide, sem depender da lista de entrada.
-    ordem = sorted(vencedoras, key=lambda v: (-v[0].metricas["taxa"], v[0].tipo))
-    while len(ordem) > 1:
-        uniao = taxa_da_uniao([m for _, m in ordem])
-        if uniao <= ordem[0][0].metricas["teto"]:
-            return
-        descartada = ordem.pop(0)[0]
-        descartada.metricas.update(motivo="uniao_acima_do_teto", taxa_uniao=float(uniao))
+def _gravar_uniao(vencedoras):
+    """Grava em cada candidata a fracao de celulas que as regras da coluna marcam somadas."""
+    uniao = float(pd.concat([m for _, m in vencedoras], axis=1).any(axis=1).mean())
+    for candidata, _ in vencedoras:
+        candidata.metricas["taxa_uniao"] = uniao
 
 
 def _mascara(candidata, entrada):

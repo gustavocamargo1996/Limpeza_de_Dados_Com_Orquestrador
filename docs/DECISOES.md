@@ -119,11 +119,20 @@ carregam valor certificado: `beers` 0 de 495 nas cinco colunas com erro;
 `dependencia`), 0 de 254 nas outras cinco. Posição: logo após `marca_celula_correta`,
 por ser a mesma evidência direta de falso positivo.
 
-**União por coluna (`uniao_acima_do_teto`).** A escolha entre variantes é por
-`(coluna, tipo)`, então tipos diferentes coexistem e a máscara final é a união,
-que nenhum teto examinava. Depois da escolha, se a união passar do teto da coluna,
-descartam-se tipos, do de maior taxa ao de menor (empate: ordem alfabética do
-tipo), até caber; o descartado guarda `taxa_uniao` em `metricas`.
+**União por coluna: tentada e removida (`uniao_acima_do_teto`).** A escolha entre
+variantes é por `(coluna, tipo)`, então tipos diferentes coexistem e a máscara
+final é a união, que nenhum teto examinava. Tentou-se um portão: se a união
+passasse do teto da coluna, descartava-se o tipo de maior taxa, até caber. Ele
+falhou por construção, porque descarta a regra boa: ela marca mais justamente por
+achar todos os erros. Caso reproduzido em `environment` `Temperature`: a regra de
+`formato` `-?\d+(\.\d+)?` marca 56 células, todas erradas (precisão 1,000); uma
+`ausente_disfarcado` de 22 sentinelas marca 52, com 8 erradas (precisão 0,154); a
+união, 100 células (0,3333), passa do teto de 0,3236, e o portão mantinha a ruim e
+descartava a boa. O buraco que ele fechava, dois tipos somando e marcando tudo, é
+menor que o dano, e ele não sabe qual regra é boa. Hoje o crivo só grava a
+`taxa_uniao` da coluna em `metricas` de cada regra que sobrevive, como informação
+para o relatório de raciocínio ("as regras desta coluna somadas marcam 33%, acima
+do que o guia sustenta"), nunca como critério.
 
 ### `DET_MINIMO` é o complemento deste número
 

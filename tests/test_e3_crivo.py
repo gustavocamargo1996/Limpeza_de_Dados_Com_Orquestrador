@@ -480,27 +480,35 @@ def par_de_tipos():
     return marca_x, marca_y
 
 
-def test_uniao_acima_do_teto_descarta_o_tipo_de_maior_taxa():
+def test_uniao_acima_do_teto_mantem_os_dois_tipos_e_grava_a_taxa():
+    # A regra de maior taxa pode ser a boa: o crivo nao descarta por uniao.
     marca_x, marca_y = par_de_tipos()
     entrada = coluna_xy(20, 15)
-    assert crivar_deteccao([marca_x, marca_y], entrada) == [marca_y]
-    assert marca_x.metricas["motivo"] == "uniao_acima_do_teto"
-    assert marca_x.metricas["taxa_uniao"] == 0.35
-    assert marca_y.metricas["motivo"] == "aprovada"
+    assert crivar_deteccao([marca_x, marca_y], entrada) == [marca_x, marca_y]
+    assert marca_x.metricas["taxa_uniao"] == marca_y.metricas["taxa_uniao"] == 0.35
+    assert marca_x.metricas["taxa_uniao"] > marca_x.metricas["teto"]
+    assert marca_x.metricas["motivo"] == marca_y.metricas["motivo"] == "aprovada"
 
 
-def test_uniao_que_cabe_no_teto_mantem_os_dois_tipos():
+def test_uniao_que_cabe_no_teto_mantem_os_dois_tipos_e_grava_a_taxa():
     marca_x, marca_y = par_de_tipos()
     assert crivar_deteccao([marca_x, marca_y], coluna_xy(10, 15)) == [marca_x, marca_y]
+    assert marca_x.metricas["taxa_uniao"] == 0.25
 
 
-def test_empate_de_taxa_nao_depende_da_ordem_da_lista():
+def test_uniao_conta_a_celula_marcada_pelas_duas_regras_uma_vez():
+    marca_x = candidata("dominio", {"valores": ["ok", "Y"]}, coluna="v")
+    marca_tudo_menos_ok = candidata("formato", {"regex": "ok"}, coluna="v")
+    assert len(crivar_deteccao([marca_x, marca_tudo_menos_ok], coluna_xy(10, 15))) == 2
+    assert marca_x.metricas["taxa_uniao"] == 0.25
+
+
+def test_a_ordem_da_lista_nao_muda_quem_sobrevive():
     marca_x, marca_y = par_de_tipos()
     entrada = coluna_xy(16, 16)
-    # Empate: dominio vem antes de formato em ordem alfabetica e cai primeiro.
-    assert crivar_deteccao([marca_x, marca_y], entrada) == [marca_y]
+    assert crivar_deteccao([marca_x, marca_y], entrada) == [marca_x, marca_y]
     marca_x, marca_y = par_de_tipos()
-    assert crivar_deteccao([marca_y, marca_x], entrada) == [marca_y]
+    assert crivar_deteccao([marca_y, marca_x], entrada) == [marca_y, marca_x]
 
 
 def guia_de_conformidade(n_fora, n=100, n_guia=20):

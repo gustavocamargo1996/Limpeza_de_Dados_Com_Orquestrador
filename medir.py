@@ -13,10 +13,7 @@ def carregar(caminho):
     """Importa o limpador gerado como modulo solto, sem instalar nada."""
     spec = importlib.util.spec_from_file_location("limpador_gerado", str(caminho))
     modulo = importlib.util.module_from_spec(spec)
-    with warnings.catch_warnings():
-        # SyntaxWarning de regex nao-raw escrita pelo LLM.
-        warnings.simplefilter("ignore")
-        spec.loader.exec_module(modulo)
+    spec.loader.exec_module(modulo)
     return modulo
 
 
@@ -52,12 +49,15 @@ def avaliar(caminho_limpador, caminho_sujo, caminho_limpo, holdout=None):
     """Aplica o limpador e mede por coluna e no total, descontando o holdout."""
     sujo = pd.read_csv(caminho_sujo, **config.LER_CSV)
     limpo = pd.read_csv(caminho_limpo, **config.LER_CSV)
-    modulo = carregar(caminho_limpador)
-    if hasattr(modulo, "aplicar_detalhado"):
-        corrigido, flags, fontes = modulo.aplicar_detalhado(sujo)
-    else:
-        corrigido, flags = modulo.aplicar(sujo)
-        fontes = None
+    with warnings.catch_warnings():
+        # O LLM escreve regex nao-raw e com grupos: SyntaxWarning ao importar, UserWarning ao aplicar.
+        warnings.simplefilter("ignore")
+        modulo = carregar(caminho_limpador)
+        if hasattr(modulo, "aplicar_detalhado"):
+            corrigido, flags, fontes = modulo.aplicar_detalhado(sujo)
+        else:
+            corrigido, flags = modulo.aplicar(sujo)
+            fontes = None
 
     manter = sujo.index.difference(pd.Index(sorted(holdout or [])))
     colunas, por_fonte = {}, {}

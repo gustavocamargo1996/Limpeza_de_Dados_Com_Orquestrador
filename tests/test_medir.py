@@ -1,10 +1,11 @@
 """A metrica, ancorada no placar da POC 1 que o HANDOFF registra."""
+import numbers
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
-from medir import avaliar, f1_reparo
+from medir import avaliar, f1_reparo, linhas_do_guia
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -65,4 +66,80 @@ def test_holdout_reduz_os_erros_contados():
         holdout={0, 1, 2, 3, 4},
     )
     assert com["holdout"] == 5
-    assert com["total"]["erros"] < sem["total"]["erros"]
+    assert sem["total"]["erros"] == 495
+    assert com["total"]["erros"] == 491
+    assert com["total"]["mudancas"] == 119
+
+
+LIMPADOR_MINIMO = """
+import pandas as pd
+
+def aplicar_detalhado(df):
+    out = df.copy()
+    flags = pd.DataFrame(False, index=df.index, columns=df.columns)
+    fontes = pd.DataFrame("", index=df.index, columns=df.columns)
+    out.loc[0, "a"], fontes.loc[0, "a"] = "c0", "regra1"
+    out.loc[1, "a"], fontes.loc[1, "a"] = "zz", "regra2"
+    out.loc[4, "b"], fontes.loc[4, "b"] = "q4", "regra1"
+    flags.loc[2, "a"] = True
+    return out, flags, fontes
+
+def aplicar(df):
+    out, flags, _ = aplicar_detalhado(df)
+    return out, flags
+"""
+
+
+@pytest.fixture
+def minimo(tmp_path):
+    """Limpador de 3 alteracoes (2 certas, 1 errada) e 1 flag, com sujo e limpo."""
+    (tmp_path / "limpador.py").write_text(LIMPADOR_MINIMO, encoding="utf-8")
+    sujo = pd.DataFrame({"a": ["s0", "s1", "s2", "s3", "s4", "s5"],
+                         "b": ["p0", "p1", "p2", "p3", "p4", "p5"]})
+    limpo = sujo.copy()
+    limpo.loc[[0, 1, 2], "a"] = ["c0", "c1", "c2"]
+    limpo.loc[[0, 4], "b"] = ["q0", "q4"]
+    sujo.to_csv(tmp_path / "sujo.csv", index=False)
+    limpo.to_csv(tmp_path / "limpo.csv", index=False)
+    return tmp_path / "limpador.py", tmp_path / "sujo.csv", tmp_path / "limpo.csv"
+
+
+def test_total_soma_acertos_e_erros_com_limpador_que_erra(minimo):
+    t = avaliar(*minimo)["total"]
+    assert (t["erros"], t["mudancas"], t["tp"], t["flags"]) == (5, 3, 2, 1)
+    assert t["precisao"] == pytest.approx(2 / 3)
+    assert t["recall"] == pytest.approx(2 / 5)
+
+
+def test_fonte_so_conta_quando_a_alteracao_acertou(minimo):
+    assert avaliar(*minimo)["fontes"] == {"regra1": 2}
+
+
+def test_holdout_respeitado_em_totais_e_fontes(minimo):
+    r = avaliar(*minimo, holdout={0})
+    t = r["total"]
+    assert (t["erros"], t["mudancas"], t["tp"], t["flags"]) == (3, 2, 1, 1)
+    assert t["precisao"] == pytest.approx(0.5)
+    assert r["fontes"] == {"regra1": 1}
+
+
+def _ints(conjunto):
+    return all(isinstance(x, numbers.Integral) for x in conjunto)
+
+
+def test_linhas_do_guia_devolve_inteiros(tmp_path):
+    (tmp_path / "l.csv").write_text("_linha,x\n3,a\n7,b\n", encoding="utf-8")
+    (tmp_path / "p.csv").write_text("linha,coluna,sujo,limpo\n9,x,a,b\n3,x,c,d\n", encoding="utf-8")
+    fora = linhas_do_guia(tmp_path / "l.csv", tmp_path / "p.csv")
+    assert fora == {3, 7, 9}
+    assert _ints(fora)
+
+
+def test_linhas_do_guia_pares_so_com_cabecalho(tmp_path):
+    (tmp_path / "l.csv").write_text("_linha,x\n3,a\n", encoding="utf-8")
+    (tmp_path / "p.csv").write_text("linha,coluna,sujo,limpo\n", encoding="utf-8")
+    assert linhas_do_guia(tmp_path / "l.csv", tmp_path / "p.csv") == {3}
+
+
+def test_linhas_do_guia_arquivos_ausentes(tmp_path):
+    assert linhas_do_guia(tmp_path / "l.csv", tmp_path / "p.csv") == set()

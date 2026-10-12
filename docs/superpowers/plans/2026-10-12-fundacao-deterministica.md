@@ -1119,8 +1119,9 @@ def detectar(df, coluna, tipo, parametros, dominancia=0.70):
         return ~serie.isin(parametros["valores"])
     if tipo == "faixa":
         numeros = pd.to_numeric(serie, errors="coerce")
-        fora = (numeros < parametros["minimo"]) | (numeros > parametros["maximo"])
-        return numeros.notna() & fora
+        # Comparacao com NaN ja devolve False, entao valor nao-numerico nao e
+        # marcado aqui: quem o pega e o tipo `formato`.
+        return (numeros < parametros["minimo"]) | (numeros > parametros["maximo"])
     if tipo == "ausente_disfarcado":
         return serie.isin(parametros["sentinelas"])
     if tipo == "dependencia":
@@ -1162,7 +1163,13 @@ Mutação A: trocar `~serie.str.fullmatch(...)` por `~serie.str.match(...)`. `te
 
 Mutação B: remover o `continue` do grupo sem maioria clara. `test_dependencia_pula_grupo_sem_maioria_clara` tem de FALHAR. Reverter.
 
-Mutação C: trocar `numeros.notna() & fora` por `fora`. `test_faixa_nao_marca_o_que_nao_e_numero` tem de FALHAR. Reverter.
+Mutação C: reescrever o retorno de `faixa` na forma negada, `~((numeros >= parametros["minimo"]) & (numeros <= parametros["maximo"]))`. `test_faixa_nao_marca_o_que_nao_e_numero` tem de FALHAR, porque na forma negada o `NaN` passa a valer `True`. Reverter.
+
+A primeira versão deste plano mandava uma mutação diferente aqui — remover um `numeros.notna() &` do retorno — e ela **não morde**, porque comparação com `NaN` já devolve `False` e a cláusula era redundante. Foi a terceira previsão de mutação errada deste plano, e as três foram pegas por implementador que se recusou a ajustar o código para encaixar numa mutação ruim.
+
+Mutação D: trocar `<` por `<=` em `contagem.iloc[0] / len(serie) < dominancia`, dentro de `moda_dominante`. O teste de dominância exata — um grupo de 10 linhas com 7 iguais e `dominancia=0.70`, que **não** deve ser pulado — tem de FALHAR. Reverter.
+
+Mutação E: remover `if len(serie) < 2: return None` de `moda_dominante`. O teste que chama a função diretamente, `moda_dominante(pd.Series(["x"]), 0.70) is None`, tem de FALHAR. Reverter. Esse guarda **não** é coberto por nenhum dos testes de `detectar`: sem ele, um grupo de uma linha tem proporção 1,0, a moda é o próprio valor, nada difere dela e nada é marcado. O guarda só tem efeito observável na tarefa 6, onde moda de grupo unitário viraria falso consenso e o reparo "corrigiria" a célula para ela mesma, contando isso como reparo.
 
 - [ ] **Step 6: Commitar**
 

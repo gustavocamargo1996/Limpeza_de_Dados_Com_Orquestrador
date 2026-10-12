@@ -1,7 +1,9 @@
-"""Os tipos que viajam entre as etapas da espinha."""
+"""O que viaja entre as etapas, ate o limpador gerado."""
 from dataclasses import dataclass, field
 
 import pandas as pd
+
+from limpeza2.motor import TIPOS
 
 
 @dataclass
@@ -52,3 +54,17 @@ class Residual:
     coluna: str
     mapa: dict
     justificativas: dict
+    caidas: dict = field(default_factory=dict)
+
+
+def regras_literais(deteccoes, reparos):
+    """As regras na forma literal que o limpador embute, na ordem do catalogo de tipos."""
+    reparo_de = {id(r.candidata): r for r in reparos}
+    regras = []
+    for c in sorted(deteccoes, key=lambda c: TIPOS.index(c.tipo)):
+        r = reparo_de.get(id(c))
+        regras.append({
+            "coluna": c.coluna, "tipo": c.tipo, "deteccao": c.parametros,
+            "estrategia": r.estrategia if r else None, "reparo": r.parametros if r else None,
+        })
+    return regras

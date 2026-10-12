@@ -63,25 +63,52 @@ nenhum e passaria por vacuidade.
 
 ---
 
-## O teto de marcação é fixado a priori {#teto-de-marcacao}
+## O teto de marcação tem piso a priori e sobe com o guia {#teto-de-marcacao}
 
-**Decisão.** `TETO_MARCACAO = 0,30`, em `config.py`, escolhido sem olhar os
-dados.
+**Decisão.** O teto da coluna é `max(TETO_MARCACAO, taxa_suja_no_guia + 2 * sqrt(0,25 / n))`,
+em `e3_crivo.teto_da_coluna`. `TETO_MARCACAO = 0,30` continua em `config.py`,
+escolhido sem olhar os dados, e agora é o **piso**. `taxa_suja_no_guia` é a
+fração das `n` linhas do guia em que `sujo != guia` naquela coluna. Sem guia, ou
+sem a coluna no guia, o teto é exatamente 0,30. O teto usado fica em
+`candidata.metricas["teto"]`, para o relatório mostrar "marcou 98% e passou"
+junto de "porque o guia diz 100%".
 
-**Por quê.** Calibrar esse número exigiria medir a taxa real de erro por coluna,
-o que exige o gabarito. Seria vazamento. O valor está acima da taxa de erro por
-coluna dos datasets em uso e muito abaixo do que permitiria marcar a coluna
-inteira.
+**O que o teto fixo impedia.** No `beers`, `ounces` está errada em 295 de 300
+linhas (98%). Um teto de 30% proibia por construção qualquer regra que detectasse
+a coluna que concentra 60% dos erros do dataset: o recall ficava travado em cerca
+de 41%. A regra de formato escrita para `ounces` morria por `marca_demais`.
 
-**Consequência declarada.** Coluna com mais de 30% de erro é subdetectada. É
-limite do método. Trocar o número depois de ver um resultado ruim seria ajustar
-ao gabarito pela porta dos fundos.
+**Por que o guia resolve.** O teto fixo existia porque, sem informação, não se
+distingue "a regra marca demais" de "a coluna está quase toda errada". O guia
+distingue: a taxa de células sujas dele, por coluna, estima a taxa de erro da
+coluna, e `n` diz com que precisão.
+
+**A forma da margem.** É o erro padrão de uma proporção observada em `n` amostras,
+no pior caso (`p = 0,5`): `sqrt(0,25 / n)`, duas vezes para cerca de 95%. Com 20
+linhas a margem é 0,22; com 40, 0,16. Ela aperta sozinha quando o guia cresce, o
+que casa com `preparar_guia.py --linhas`. O `max` com o a priori não é enfeite:
+em coluna que o guia viu limpa, a taxa é 0 e a margem sozinha (0,22) ficaria
+abaixo de 0,30, apertando o teto e reprovando regra que antes passava.
+
+**Honestidade sobre a ordem dos fatos.** A **forma** da margem vem do argumento
+de erro amostral, que se sustenta lendo só o tamanho do guia. Mas o autor
+**verificou** que ela funciona nas duas tabelas comparando a taxa suja do guia
+com a taxa de erro real, e essa verificação usou o gabarito (`beers`: `ounces`
+1,00 contra 0,98 real, `ibu` 0,40 contra 0,37, `abv` 0,35 contra 0,23;
+`environment`: `State` 0,10 contra 0,18). É confirmação posterior: não foi o que
+escolheu a fórmula, e o número 2 não foi ajustado.
+
+**Consequência declarada.** O guia agora supervisiona também o teto: um guia
+pequeno e azarado pode subir o teto de uma coluna que é limpa (`Climate_Zone`:
+guia 0,20, real 0,09, teto 0,42). O custo é aceito porque os outros testes do
+crivo continuam valendo. A regra `^[A-Z]{2}$` que marcava 300 de 300 em `State`
+continua morrendo (teto 0,32), e esse caso não pode voltar.
 
 ### `DET_MINIMO` é o complemento deste número
 
 `DET_MINIMO = 0.70`: uma dependência entre colunas só vira candidata se valer em
-pelo menos 70% das linhas. **É a mesma premissa de `TETO_MARCACAO`, dita uma vez
-só.** Se o projeto declara não acreditar que uma coluna esteja mais de 30%
+pelo menos 70% das linhas. **É a mesma premissa do piso de `TETO_MARCACAO`, dita uma
+vez só.** Se o projeto declara não acreditar que uma coluna esteja mais de 30%
 errada, então uma dependência verdadeira não pode falhar em mais de 30% das
 linhas.
 

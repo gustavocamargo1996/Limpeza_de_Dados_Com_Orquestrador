@@ -195,7 +195,7 @@ são ruído. Contar grupos premiava o segundo e barrava o primeiro.
 #### Os dois limiares são a mesma afirmação
 
 A razão de determinação tem de passar de **0,70**, e isso não é um número solto:
-é o complemento do teto de marcação de 30% da seção 5. Se o limpador parte do
+é o complemento do piso de 30% do teto de marcação da seção 5. Se o limpador parte do
 princípio de que nenhuma coluna está mais de 30% errada, então uma dependência
 verdadeira não pode falhar em mais de 30% das linhas. A mesma crença, escrita nos
 dois lugares onde ela tem consequência.
@@ -280,7 +280,7 @@ passar por cinco testes. Nenhum deles consulta o gabarito.
 |---|---|---|---|
 | 1 | **controle por célula** | ela marca uma célula do guia que o sujo já tinha certa (`sujo == guia`, na coluna da regra) | regra que estraga dado bom |
 | 2 | **não-vacuidade** | ela não marca nenhuma célula da tabela suja | regra que nunca viu um erro ser aprovada no silêncio |
-| 3 | **teto de marcação** | ela marca mais que 30% da coluna | a regra "marca tudo" |
+| 3 | **teto de marcação** | ela marca mais que o teto da coluna (piso de 30%, sobe com a taxa suja do guia) | a regra "marca tudo" |
 | 4 | **piso do guia** | existem pares `sujo → limpo` naquela coluna e ela não marca todos | regra que ignora o erro que o humano apontou |
 | 5 | **ambiguidade** | só para `dependencia`: a fração de grupos sem maioria clara passa do limiar | a dependência do tipo `flights` |
 
@@ -299,16 +299,28 @@ explicável numa frase.
 
 Os cinco tipos de erro coexistem na mesma coluna: a máscara final é a união.
 
-### Sobre o teto de 30%
+### Sobre o teto de marcação
 
-Esse número **não foi calibrado, e não pode ser**. Olhar a taxa real de erro de
-cada coluna para escolher o teto seria ler o gabarito. Ele está fixado a priori,
-acima da taxa de erro por coluna dos datasets em uso e muito abaixo do que
-permitiria marcar uma coluna inteira.
+O teto é **por coluna**: `max(0,30, taxa_suja_no_guia + 2 * sqrt(0,25 / n))`, com
+`n` o número de linhas do guia. O 0,30 é o a priori e funciona como piso; a parte
+informada pelo guia sobe o teto só onde o guia viu a coluna suja. Sem guia, o teto
+é exatamente 0,30. A taxa suja do guia acompanha a taxa de erro real (verificado
+depois, com o gabarito, e dito como tal em `docs/DECISOES.md#teto-de-marcacao`):
 
-Consequência declarada: numa tabela em que alguma coluna tenha mais de 30% de
-erro, o limpador vai subdetectar essa coluna. É um limite conhecido do método,
-não um defeito a consertar escolhendo um número mais bonito.
+| Dataset | Coluna | Taxa suja no guia | Taxa de erro real |
+|---|---|---|---|
+| `beers` | `ounces` | 1,00 | 0,98 |
+| `beers` | `ibu` | 0,40 | 0,37 |
+| `beers` | `abv` | 0,35 | 0,23 |
+| `beers` | `city` | 0,00 | 0,03 |
+| `environment` | `State` | 0,10 | 0,18 |
+| `environment` | `Measurement_Date` | 0,25 | 0,16 |
+| `environment` | `Climate_Zone` | 0,20 | 0,09 |
+
+`ounces` passa porque o guia a viu 100% suja (teto 1,22), e uma regra que marca
+98% está de acordo com ele; `State` não passa porque o guia a viu 10% suja (teto
+0,32), e a regra `^[A-Z]{2}$`, que marca 300 de 300, está muito acima. O teto
+usado vai ao lado da taxa de marcação no relatório de raciocínio.
 
 ---
 

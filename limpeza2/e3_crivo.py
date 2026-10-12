@@ -1,4 +1,6 @@
 """Etapa 3: reprova a regra candidata que nao se sustenta, sem LLM e sem gabarito."""
+from math import sqrt
+
 import pandas as pd
 
 from limpeza2 import config
@@ -40,7 +42,8 @@ def _mascara(candidata, entrada):
 
     marcadas = int(mascara.sum())
     candidata.metricas = {
-        "marcadas": marcadas, "taxa": marcadas / len(sujo), "motivo": "aprovada"
+        "marcadas": marcadas, "taxa": marcadas / len(sujo), "motivo": "aprovada",
+        "teto": teto_da_coluna(entrada, candidata.coluna),
     }
     motivo = _reprovar(candidata, entrada, mascara)
     if motivo:
@@ -66,7 +69,7 @@ def _reprovar(candidata, entrada, mascara):
         return "marca_celula_correta"
     if candidata.metricas["marcadas"] == 0:
         return "vacua"
-    if candidata.metricas["taxa"] > config.TETO_MARCACAO:
+    if candidata.metricas["taxa"] > candidata.metricas["teto"]:
         return "marca_demais"
     pares = entrada.guia_pares
     if not pares.empty:
@@ -75,6 +78,17 @@ def _reprovar(candidata, entrada, mascara):
         if len(alvos) and not bool(mascara.loc[alvos].all()):
             return "perde_par_do_guia"
     return None
+
+
+def teto_da_coluna(entrada, coluna):
+    """O teto de marcacao da coluna: o a priori, ou a taxa suja do guia mais 2 erros padrao."""
+    linhas = entrada.guia_linhas.index.intersection(entrada.sujo.index)
+    if coluna not in entrada.guia_linhas.columns or len(linhas) == 0:
+        return config.TETO_MARCACAO
+    certo = entrada.guia_linhas.loc[linhas, coluna]
+    suja = float((entrada.sujo.loc[linhas, coluna] != certo).mean())
+    # Margem de 2 erros padrao de uma proporcao no pior caso (p = 0,5).
+    return max(config.TETO_MARCACAO, suja + 2 * sqrt(0.25 / len(linhas)))
 
 
 def _celulas_certas(entrada, coluna, mascara):

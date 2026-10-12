@@ -2,7 +2,8 @@
 import pandas as pd
 import pytest
 
-from limpeza2.e3_crivo import _reprovar_reparo, crivar_deteccao, crivar_reparo
+from limpeza2 import config
+from limpeza2.e3_crivo import _reprovar_reparo, crivar_deteccao, crivar_reparo, teto_da_coluna
 from limpeza2.tipos import Candidata, Entrada, Perfil, Reparo
 
 
@@ -338,3 +339,65 @@ def test_crivar_reparo_reprova_quem_escreve_em_celula_certa_do_guia(sujo):
     r = Reparo(candidata=c, estrategia="dicionario", parametros={}, raciocinio="x")
     mascara = pd.Series(False, index=novo.index)
     assert _reprovar_reparo(entrada, novo, reparada, r, mascara) == "corrompe_celula_do_guia"
+
+
+def guia_de_taxa(sujas_no_guia, n_guia, sujas_fora, n=100):
+    """Coluna `v` com `ok` ou `X`: o guia tem as n_guia primeiras linhas, `sujas_no_guia` delas sujas."""
+    valores = ["ok"] * n
+    for i in list(range(sujas_no_guia)) + list(range(n_guia, n_guia + sujas_fora)):
+        valores[i] = "X"
+    sujo = pd.DataFrame({"v": valores})
+    corrigidos = {(i, "v"): "ok" for i in range(sujas_no_guia)}
+    return monta_entrada(sujo, linhas_guia=range(n_guia), corrigidos=corrigidos)
+
+
+def regra_ok():
+    return candidata("dominio", {"valores": ["ok"]}, coluna="v")
+
+
+def test_teto_sobe_quando_o_guia_esta_todo_sujo():
+    entrada = guia_de_taxa(20, 20, 78)
+    c = regra_ok()
+    assert crivar_deteccao([c], entrada) == [c]
+    assert c.metricas["taxa"] == 0.98
+    assert c.metricas["teto"] == pytest.approx(1.0 + 2 * (0.25 / 20) ** 0.5)
+
+
+def test_guia_quase_limpo_mantem_o_teto_e_reprova_quem_marca_demais():
+    entrada = guia_de_taxa(0, 20, 80)
+    c = regra_ok()
+    assert crivar_deteccao([c], entrada) == []
+    assert c.metricas["teto"] == config.TETO_MARCACAO
+    assert c.metricas["motivo"] == "marca_demais"
+
+
+def test_guia_vazio_da_exatamente_o_a_priori(sujo):
+    assert teto_da_coluna(monta_entrada(sujo), "estado") == config.TETO_MARCACAO
+
+
+def test_guia_sem_a_coluna_da_o_a_priori(sujo):
+    entrada = monta_entrada(sujo, linhas_guia=(0, 1))
+    entrada.guia_linhas = entrada.guia_linhas[["cidade"]]
+    assert teto_da_coluna(entrada, "estado") == config.TETO_MARCACAO
+
+
+def test_guia_sem_sujeira_nao_aperta_o_teto_abaixo_do_a_priori():
+    # A margem sozinha (0,22) fica abaixo do a priori: marcar 25% tem de passar.
+    entrada = guia_de_taxa(0, 20, 25)
+    c = regra_ok()
+    assert crivar_deteccao([c], entrada) == [c]
+    assert c.metricas["teto"] == config.TETO_MARCACAO
+
+
+def test_a_margem_alarga_o_teto_acima_da_taxa_do_guia():
+    # Guia com 25% sujo: teto 0,47, e a regra marca 40%.
+    entrada = guia_de_taxa(5, 20, 35)
+    c = regra_ok()
+    assert crivar_deteccao([c], entrada) == [c]
+    assert c.metricas["taxa"] == 0.40
+
+
+def test_a_margem_diminui_quando_o_guia_cresce():
+    pequeno = teto_da_coluna(guia_de_taxa(5, 20, 0), "v")
+    grande = teto_da_coluna(guia_de_taxa(10, 40, 0), "v")
+    assert grande < pequeno

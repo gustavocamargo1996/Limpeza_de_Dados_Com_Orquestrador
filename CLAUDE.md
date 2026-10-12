@@ -172,10 +172,15 @@ de aplicação.
 Todo Python escrito por LLM é validado antes de rodar: análise da AST com
 allowlist de builtins, proibição de `import`, dunder, `eval`/`exec`/`open`/
 `getattr`, e execução em namespace descartável, nunca `globals()`. Afrouxar o
-portão é decisão de segurança, não conveniência. A POC 1 tem uma
-implementação pronta e testada em
-`../POC_Limpeza_de_Dados/limpeza/sandbox.py`. Pode copiar e adaptar, mas o
-teto de tamanho também vale para ela.
+portão é decisão de segurança, não conveniência.
+
+A POC 1 tem uma implementação em `../POC_Limpeza_de_Dados/limpeza/sandbox.py`,
+que foi copiada e adaptada. **Ela tem um escape**, confirmado por execução em
+12/10/2026: ela entrega o módulo `re` ao namespace, e dele se alcança
+`re.enum.sys.modules["os"]`. O portão desta POC entrega um **proxy** de `re`,
+barra leitura de `.format` e `.format_map`, barra escrita e remoção de atributo,
+e constrói um proxy novo por materialização. Detalhe e evidência em
+`docs/DECISOES.md#portao-ast`. Não copie mais nada de lá sem sondar primeiro.
 
 O limpador gerado roda **sem** o portão na máquina do usuário. O cabeçalho
 dele avisa isso.

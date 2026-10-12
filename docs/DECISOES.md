@@ -202,13 +202,52 @@ brainstorming).
 
 ## Portão AST {#portao-ast}
 
-**Decisão.** Adaptado de `../POC_Limpeza_de_Dados/limpeza/sandbox.py`: allowlist
-de builtins, proibição de `import`, dunder, `eval`, `exec`, `compile`, `open`,
-`getattr` e companhia, execução em namespace descartável, nunca `globals()`.
+**Decisão.** Adaptado de `../POC_Limpeza_de_Dados/limpeza/sandbox.py`, com quatro
+correções que a POC 1 não tem: allowlist de builtins, proibição de `import`,
+dunder, `eval`, `exec`, `compile`, `open`, `getattr` e companhia, execução em
+namespace descartável e nunca `globals()`, **um proxy de `re` em vez do módulo**,
+**proibição de ler `.format` e `.format_map`**, **proibição de escrever ou apagar
+atributo**, e **um proxy novo por materialização**.
 
-**Por quê.** Já é implementação testada, e cabe no orçamento com 142 linhas.
-`re` fica disponível no namespace e `pd` fora — o que casa com a decisão de o
-LLM escrever só funções escalares.
+**Por quê as quatro correções, e o que elas consertam.** Eu escrevi antes que o
+`sandbox.py` da POC 1 "já é implementação testada". Isso estava errado num ponto
+que importa: ele entrega o **módulo** `re` ao namespace, e o módulo `re` importa
+`enum`, que importa `sys`. Executado contra a versão herdada, em 12/10/2026:
+
+```python
+def corrigir(valor):
+    return str(re.enum.sys.modules["os"].getcwd())
+```
+
+Isso passou pelo portão e devolveu o diretório do projeto. Com `.system(...)` no
+lugar de `getcwd()`, é execução arbitrária de comando na máquina de quem gera.
+A análise de AST não vê nada: a chamada tem `func` como `Attribute`, não como
+`Name`, e nenhum atributo começa com `__`. A premissa "o LLM só tem `re`" é
+falsa — a superfície real é o grafo de atributos de `re`.
+
+Mais dois furos da mesma família, achados na sequência e também confirmados por
+execução: `f = "{0.__class__}".format` seguido de `f(valor)` devolvia
+`<class 'str'>`, porque a proibição só olhava chamada e não leitura; e
+`re.sub = len` **executava**, envenenando o proxy compartilhado, de modo que a
+função materializada depois quebrava. Esse último é o mais grave para a POC, e
+não por ser vazamento: o crivo aprova ou reprova regra **executando-a**, então um
+proxy envenenado faria regras seguintes falharem ou devolverem valor errado, e a
+POC registraria isso como propriedade da regra.
+
+**Este buraco existe na POC 1**, que está publicada em
+`github.com/gustavocamargo1996/AgenteLimpezaDeDados`. Aqui a POC 1 é somente
+leitura, então a correção lá é decisão do usuário.
+
+**Garantia por sondagem, não prova.** Depois das correções, 29 sondas foram
+executadas contra o portão: `re.enum`, `re.functools` e `re.sys` dão
+`AttributeError`; `.format` e `.format_map` são barrados em leitura e em chamada;
+escrita de atributo é barrada; e nada alcançou módulo nem caminho de arquivo.
+Os atributos não-dunder de `Pattern`, de `Match` e dos tipos nativos da allowlist
+foram sondados e não levam a lugar nenhum. Isso é evidência, não demonstração: a
+superfície de um sandbox em processo nunca é provada segura por teste.
+
+`re` chega ao namespace como proxy e `pd` fica fora — o que casa com a decisão de
+o LLM escrever só funções escalares.
 
 **O limpador gerado roda sem o portão** na máquina do usuário. O cabeçalho dele
 avisa isso.

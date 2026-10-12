@@ -1012,7 +1012,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: nada do projeto. **`motor.py` não importa nenhum módulo deste repositório**, porque o texto-fonte dele é copiado inteiro para dentro do limpador gerado. Ver `docs/DECISOES.md#motor-unico`.
-- Produces: `limpeza2.motor.detectar(df, coluna, tipo, parametros, dominancia=0.70) -> pd.Series` de booleanos, alinhada a `df.index`. Tipos aceitos: `formato` (`{"regex": str}`), `dominio` (`{"valores": list[str]}`), `faixa` (`{"minimo": float, "maximo": float}`), `ausente_disfarcado` (`{"sentinelas": list[str]}`), `dependencia` (`{"determinantes": list[str]}`).
+- Produces: `limpeza2.motor.detectar(df, coluna, tipo, parametros, dominancia=0.70) -> pd.Series` de booleanos, alinhada a `df.index`. Tipos aceitos: `formato` (`{"regex": str}`), `dominio` (`{"valores": list[str]}`), `faixa` (`{"minimo": float, "maximo": float}`), `ausente_disfarcado` (`{"sentinelas": list[str]}`), `dependencia` (`{"determinantes": list[str]}`). Mais `limpeza2.motor.{moda_dominante(serie, dominancia) -> str | None, divergentes_da_moda(df, determinantes, coluna, dominancia) -> pd.Series}` e a tupla `TIPOS`.
 
 - [ ] **Step 1: Escrever os testes, que vão falhar**
 
@@ -1121,18 +1121,28 @@ def detectar(df, coluna, tipo, parametros, dominancia=0.70):
     raise ValueError(f"tipo de regra desconhecido: {tipo}")
 
 
+def moda_dominante(serie, dominancia):
+    """O valor majoritario da serie, ou None quando nao existe maioria clara."""
+    if len(serie) < 2:
+        return None
+    contagem = serie.value_counts()
+    if contagem.iloc[0] / len(serie) < dominancia:
+        return None
+    return contagem.index[0]
+
+
 def divergentes_da_moda(df, determinantes, coluna, dominancia):
     """Marca quem discorda da moda do grupo, pulando grupo sem maioria clara."""
     mascara = pd.Series(False, index=df.index)
     for _, grupo in df.groupby(determinantes, sort=False):
-        if len(grupo) < 2:
+        moda = moda_dominante(grupo[coluna], dominancia)
+        if moda is None:
             continue
-        contagem = grupo[coluna].value_counts()
-        if contagem.iloc[0] / len(grupo) < dominancia:
-            continue
-        mascara.loc[grupo.index[grupo[coluna] != contagem.index[0]]] = True
+        mascara.loc[grupo.index[grupo[coluna] != moda]] = True
     return mascara
 ```
+
+`moda_dominante` é extraída desde já porque a tarefa 6 precisa da **mesma** conta para reparar. Duas contas da mesma moda, uma para marcar e outra para corrigir, são a divergência da lição 8 da POC 1 em escala pequena.
 
 - [ ] **Step 4: Rodar e ver passar**
 
@@ -1181,7 +1191,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Test: `tests/test_motor_reparo.py`
 
 **Interfaces:**
-- Consumes: `limpeza2.motor.divergentes_da_moda` (tarefa 5).
+- Consumes: `limpeza2.motor.{moda_dominante, divergentes_da_moda}` (tarefa 5). **`_reparar_por_moda` usa `moda_dominante`, nunca recalcula a moda.**
 - Produces: `limpeza2.motor.reparar(df, coluna, estrategia, parametros, mascara, funcoes=None, dominancia=0.70) -> tuple[pd.DataFrame, pd.Series]`, devolvendo o DataFrame novo e a máscara do que foi reparado. Estratégias: `normalizar` (`{"funcao": str}`, resolvida em `funcoes`), `moda_condicionada` (`{"determinantes": list[str]}`), `vizinho_no_dominio` (`{"dominio": list[str], "distancia": int}`), `dicionario` (`{"mapa": dict}`), `esvaziar` (`{}`). Mais `limpeza2.motor.distancia_edicao(a: str, b: str) -> int`.
 
 `reparar` devolve o DataFrame inteiro, não só a coluna, porque a exceção do determinante corrige **outra** coluna. Ver `docs/DECISOES.md#lado-errado-da-dependencia`.
@@ -1426,12 +1436,11 @@ def _reparar_por_moda(novo, original, coluna, determinantes, alvos, dominancia, 
 
     for _, grupo in novo.groupby(determinantes, sort=False):
         pendentes = grupo.index.intersection(alvos)
-        if len(grupo) < 2 or pendentes.empty:
+        if pendentes.empty:
             continue
-        contagem = grupo[coluna].value_counts()
-        if contagem.iloc[0] / len(grupo) < dominancia:
+        moda = moda_dominante(grupo[coluna], dominancia)
+        if moda is None:
             continue
-        moda = contagem.index[0]
         for linha in pendentes:
             if novo.at[linha, coluna] != moda:
                 novo.at[linha, coluna] = moda
@@ -1800,9 +1809,11 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Consumes: `limpeza2.motor.{detectar, reparar}`, `limpeza2.tipos.{Candidata, Entrada, Reparo}`, `limpeza2.config.{TETO_MARCACAO, TETO_AMBIGUIDADE, DOMINANCIA_MODA}`.
 - Produces: `limpeza2.e3_crivo.{crivar_deteccao(candidatas: list[Candidata], entrada: Entrada) -> list[Candidata], crivar_reparo(propostas: list[Reparo], entrada: Entrada, funcoes: dict | None = None) -> list[Reparo], MOTIVOS}`.
 
-Toda candidata recebe `metricas` preenchido — `{"marcadas", "taxa", "motivo"}` — **aprovada ou não**, porque o Markdown de raciocínio precisa mostrar a reprovação. `MOTIVOS` é a tupla dos motivos possíveis: `("aprovada", "toca_linha_limpa", "vacua", "marca_demais", "perde_par_do_guia", "ambigua", "lancou", "nao_repara")`.
+Toda candidata recebe `metricas` preenchido — `{"marcadas", "taxa", "motivo"}` — **aprovada ou não**, porque o Markdown de raciocínio precisa mostrar a reprovação. `MOTIVOS` é a tupla dos motivos possíveis: `("aprovada", "toca_linha_limpa", "vacua", "marca_demais", "perde_par_do_guia", "ambigua", "sem_perfil", "lancou", "nao_repara")`.
 
 Entre variantes do mesmo `(coluna, tipo)`, sobrevive a de **menor taxa de marcação** que passa em todos os testes.
+
+**`sem_perfil` fecha um buraco achado na varredura de conflitos.** A tarefa 7 só minera determinante de **coluna única**, então um `dependencia` com determinante composto não tem entrada em `Perfil.pares`, e um `.get(..., {})` faria `frac_ambiguos` valer 0,0 por omissão — o teste de ambiguidade seria pulado em silêncio, que é a lição 6 com nome novo. A regra passa a ser explícita: sem entrada no perfil, reprovada. Minerar determinante composto (o ZeroEC usa `(State, Measure) -> Stateavg`) fica declarado como pendência da parte 2, com o custo de, por ora, perder dependência de chave composta.
 
 - [ ] **Step 1: Escrever os testes, que vão falhar**
 
@@ -1834,11 +1845,16 @@ def monta_entrada(sujo, linhas_guia=(), pares=()):
 
 @pytest.fixture
 def sujo():
+    # Dez linhas, com DUAS celulas estranhas em estado: XX na linha 4 e YY na
+    # linha 9. Duas sao o minimo para distinguir "marcou algo" de "pegou o par".
     return pd.DataFrame(
         {
-            "estado": ["MA", "MA", "TX", "TX", "XX", "MA", "TX", "MA", "MA", "TX"],
+            "estado": ["MA", "MA", "TX", "TX", "XX", "MA", "TX", "MA", "MA", "YY"],
             "cidade": ["Boston", "Boston", "Austin", "Austin", "Boston",
                        "Boston", "Austin", "Boston", "Boston", "Austin"],
+            # So existe para o caso de determinante composto: sem ela, o
+            # groupby lancaria KeyError e o motivo seria "lancou".
+            "zona": ["T"] * 10,
         }
     )
 
@@ -1851,13 +1867,13 @@ def test_aprova_regra_que_marca_pouco_e_acha_erro(sujo):
     entrada = monta_entrada(sujo)
     c = candidata("dominio", {"valores": ["MA", "TX"]})
     assert crivar_deteccao([c], entrada) == [c]
-    assert c.metricas["marcadas"] == 1
+    assert c.metricas["marcadas"] == 2
     assert c.metricas["motivo"] == "aprovada"
 
 
 def test_reprova_regra_vacua(sujo):
     entrada = monta_entrada(sujo)
-    c = candidata("dominio", {"valores": ["MA", "TX", "XX"]})
+    c = candidata("dominio", {"valores": ["MA", "TX", "XX", "YY"]})
     assert crivar_deteccao([c], entrada) == []
     assert c.metricas["marcadas"] == 0
     assert c.metricas["motivo"] == "vacua"
@@ -1879,9 +1895,12 @@ def test_reprova_regra_que_toca_linha_limpa_do_guia(sujo):
 
 def test_reprova_regra_que_perde_par_do_guia(sujo):
     entrada = monta_entrada(sujo, pares=[(4, "estado", "XX", "MA")])
-    c = candidata("ausente_disfarcado", {"sentinelas": ["ZZ"]})
+    # Marca a linha 9 (YY) e nao marca a 4 (XX), que e a do par: passa na
+    # nao-vacuidade e no teto, e cai justamente no piso do guia.
+    c = candidata("dominio", {"valores": ["MA", "TX", "XX"]})
     assert crivar_deteccao([c], entrada) == []
-    assert c.metricas["motivo"] in {"vacua", "perde_par_do_guia"}
+    assert c.metricas["marcadas"] == 1
+    assert c.metricas["motivo"] == "perde_par_do_guia"
 
 
 def test_aprova_regra_que_pega_o_par_do_guia(sujo):
@@ -1913,22 +1932,39 @@ def test_reprova_regra_que_lanca(sujo):
 
 def test_entre_variantes_fica_a_que_marca_menos(sujo):
     entrada = monta_entrada(sujo)
-    larga = candidata("dominio", {"valores": ["MA"]})
-    estreita = candidata("dominio", {"valores": ["MA", "TX"]})
+    # As DUAS passam nos cinco testes: a larga marca 2 celulas, a estreita 1.
+    # Se uma fosse reprovada pelo teto, o teste nao estaria medindo a escolha.
+    larga = candidata("dominio", {"valores": ["MA", "TX"]})
+    estreita = candidata("dominio", {"valores": ["MA", "TX", "YY"]})
     sobreviventes = crivar_deteccao([larga, estreita], entrada)
     assert sobreviventes == [estreita]
+    assert larga.metricas["motivo"] == "aprovada"
+    assert larga.metricas["marcadas"] == 2
+    assert estreita.metricas["marcadas"] == 1
 
 
-def test_crivar_reparo_reprova_quem_toca_linha_limpa(sujo):
+@pytest.mark.parametrize(
+    "determinantes", [["cidade", "zona"], ["cidade"]], ids=["composto", "sem_entrada"]
+)
+def test_reprova_dependencia_sem_perfil(sujo, determinantes):
+    entrada = monta_entrada(sujo)
+    c = candidata("dependencia", {"determinantes": determinantes}, coluna="estado")
+    assert crivar_deteccao([c], entrada) == []
+    assert c.metricas["motivo"] == "sem_perfil"
+
+
+def test_crivar_reparo_guarda_contra_reparo_fora_da_mascara(sujo):
+    # Guarda de regressao, nao caminho normal: nenhuma das cinco estrategias
+    # toca linha fora da mascara, e este teste e o que acusa se alguma passar
+    # a tocar. Por isso chama a funcao interna direto.
+    from limpeza2.e3_crivo import _reprovar_reparo
+
     entrada = monta_entrada(sujo, linhas_guia=(0, 1))
-    c = candidata("dominio", {"valores": ["MA", "TX"]})
-    crivar_deteccao([c], entrada)
-    r = Reparo(
-        candidata=c, estrategia="esvaziar", parametros={}, raciocinio="x"
-    )
-    # Forca a mascara a pegar uma linha limpa do guia.
-    c.parametros = {"valores": ["TX"]}
-    assert crivar_reparo([r], entrada) == []
+    novo = entrada.sujo.copy()
+    novo.at[0, "estado"] = "ZZ"
+    reparada = pd.Series(False, index=novo.index)
+    reparada.loc[4] = True
+    assert _reprovar_reparo(entrada, novo, reparada) == "toca_linha_limpa"
 
 
 def test_crivar_reparo_aprova_quem_repara_e_respeita_o_guia(sujo):
@@ -1941,8 +1977,11 @@ def test_crivar_reparo_aprova_quem_repara_e_respeita_o_guia(sujo):
         parametros={"determinantes": ["cidade"]},
         raciocinio="x",
     )
+    # Marca as linhas 4 (XX) e 9 (YY). O grupo Boston tem moda MA em 5 de 6, e
+    # o grupo Austin tem TX em 3 de 4, entao as duas sao reparadas.
     assert crivar_reparo([r], entrada) == [r]
-    assert r.candidata.metricas["reparadas"] == 1
+    assert r.candidata.metricas["reparadas"] == 2
+    assert r.candidata.metricas["motivo_reparo"] == "aprovada"
 
 
 def test_crivar_reparo_reprova_quem_nao_repara_nada(sujo):
@@ -1975,7 +2014,7 @@ from limpeza2.motor import detectar, reparar
 
 MOTIVOS = (
     "aprovada", "toca_linha_limpa", "vacua", "marca_demais",
-    "perde_par_do_guia", "ambigua", "lancou", "nao_repara",
+    "perde_par_do_guia", "ambigua", "sem_perfil", "lancou", "nao_repara",
 )
 
 
@@ -2021,10 +2060,15 @@ def _mascara(candidata, entrada):
 def _reprovar(candidata, entrada, mascara):
     """O primeiro dos cinco testes que a candidata falha, ou None se passar em todos."""
     if candidata.tipo == "dependencia":
-        par = entrada.perfil.pares.get(
-            (candidata.parametros["determinantes"][0], candidata.coluna), {}
-        )
-        if par.get("frac_ambiguos", 0.0) > config.TETO_AMBIGUIDADE:
+        determinantes = candidata.parametros["determinantes"]
+        # Sem entrada no perfil nao ha como medir a ambiguidade, e deixar
+        # passar seria a vacuidade da licao 6 com nome novo.
+        if len(determinantes) != 1:
+            return "sem_perfil"
+        par = entrada.perfil.pares.get((determinantes[0], candidata.coluna))
+        if par is None:
+            return "sem_perfil"
+        if par["frac_ambiguos"] > config.TETO_AMBIGUIDADE:
             return "ambigua"
     linhas_limpas = entrada.guia_linhas.index.intersection(entrada.sujo.index)
     if len(linhas_limpas) and bool(mascara.loc[linhas_limpas].any()):
@@ -2092,7 +2136,7 @@ def _reprovar_reparo(entrada, novo, reparada):
 - [ ] **Step 4: Rodar e ver passar**
 
 Run: `.venv/Scripts/python -m pytest tests/test_e3_crivo.py -v`
-Expected: PASS, 13 testes. Dois dos testes escritos no passo 1 (`test_crivar_reparo_reprova_quem_toca_linha_limpa` e `test_reprova_regra_que_perde_par_do_guia`) mexem na candidata depois do crivo; se eles ficarem frágeis, reescreva-os montando a `Entrada` diretamente em vez de mutar a candidata, mantendo a asserção.
+Expected: PASS, 15 testes (contando os dois casos parametrizados de `sem_perfil`).
 
 - [ ] **Step 5: Prova por mutação — a mais importante do projeto**
 
@@ -2109,6 +2153,8 @@ Mutação D: trocar `not bool(mascara.loc[alvos].all())` por `False`. `test_repr
 Mutação E: trocar `if par.get("frac_ambiguos", 0.0) > config.TETO_AMBIGUIDADE` por `> 2.0`. `test_reprova_dependencia_ambigua` tem de FALHAR. Reverter.
 
 Mutação F: trocar `candidata.metricas["taxa"] < anterior.metricas["taxa"]` por `>`. `test_entre_variantes_fica_a_que_marca_menos` tem de FALHAR. Reverter.
+
+Mutação G: trocar `par = entrada.perfil.pares.get((determinantes[0], candidata.coluna))` seguido de `if par is None: return "sem_perfil"` por `par = entrada.perfil.pares.get((determinantes[0], candidata.coluna), {"frac_ambiguos": 0.0})`, removendo o `if`. `test_reprova_dependencia_sem_perfil[sem_entrada]` tem de FALHAR. **Esta é a lição 6 na sua forma mais sutil: a dependência sem perfil passando por omissão.** Reverter.
 
 - [ ] **Step 6: Rodar a suíte inteira e medir**
 

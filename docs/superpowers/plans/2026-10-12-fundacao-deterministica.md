@@ -57,7 +57,7 @@ Fora desta parte, na parte 2: `provedor.py`, `e2_detector.py`, `e4_especificador
 
 **Interfaces:**
 - Consumes: nada.
-- Produces: `limpeza2.tipos.{Perfil, Entrada, Candidata, Reparo, Residual}`; `limpeza2.config.{DATASETS, GUIA, SAIDA, LER_CSV, SEMENTE, LINHAS_GUIA, PARES_POR_COLUNA, TETO_MARCACAO, DOMINANCIA_MODA, TETO_AMBIGUIDADE, DET_MINIMO, GRUPOS_MINIMOS, VARIANTES_POR_TIPO, PROVEDOR, MODELO}`.
+- Produces: `limpeza2.tipos.{Perfil, Entrada, Candidata, Reparo, Residual}`; `limpeza2.config.{DATASETS, GUIA, SAIDA, LER_CSV, SEMENTE, LINHAS_GUIA, PARES_POR_COLUNA, TETO_MARCACAO, DOMINANCIA_MODA, TETO_AMBIGUIDADE, DET_MINIMO, COBERTURA_MINIMA, GRUPOS_MINIMOS_PAR, VARIANTES_POR_TIPO, PROVEDOR, MODELO}`.
 
 - [ ] **Step 1: Criar o ambiente**
 
@@ -229,8 +229,11 @@ PARES_POR_COLUNA = 2
 TETO_MARCACAO = 0.30
 DOMINANCIA_MODA = 0.70
 TETO_AMBIGUIDADE = 0.30
-DET_MINIMO = 0.85
-GRUPOS_MINIMOS = 10
+# DET_MINIMO e o complemento de TETO_MARCACAO: ninguem acredita em coluna
+# mais de 30% errada. Ver docs/DECISOES.md#teto-de-marcacao.
+DET_MINIMO = 0.70
+COBERTURA_MINIMA = 0.50
+GRUPOS_MINIMOS_PAR = 2
 VARIANTES_POR_TIPO = 3
 
 PROVEDOR = os.getenv("PROVEDOR", "openai")
@@ -1527,12 +1530,12 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Test: `tests/test_e1_perfil.py`
 
 **Interfaces:**
-- Consumes: `limpeza2.config.{LER_CSV, DOMINANCIA_MODA, DET_MINIMO, GRUPOS_MINIMOS}`, `limpeza2.tipos.{Entrada, Perfil}`.
+- Consumes: `limpeza2.config.{LER_CSV, DOMINANCIA_MODA, DET_MINIMO, COBERTURA_MINIMA, GRUPOS_MINIMOS_PAR}`, `limpeza2.tipos.{Entrada, Perfil}`.
 - Produces: `limpeza2.e1_perfil.{padrao(valor: str, nivel: int = 1) -> str, perfilar_coluna(serie) -> dict, perfilar_par(df, determinante, determinado, dominancia) -> dict, perfilar(caminho_sujo, caminho_guia) -> Entrada}`.
   - `perfilar_coluna` devolve `{"n_distintos", "n_vazios", "frequentes", "raros", "padroes", "comprimentos"}`.
-  - `perfilar_par` devolve `{"det", "n_grupos", "n_divergentes", "frac_ambiguos"}`.
+  - `perfilar_par` devolve `{"det", "n_grupos", "cobertura", "n_divergentes", "frac_ambiguos"}`.
   - `Perfil.pares` é `{(determinante, determinado): dict}`, só com os pares acima dos limiares.
-  - `Perfil.candidatas_sujeito` é a lista das três colunas que determinam mais outras colunas.
+  - `Perfil.candidatas_sujeito` é a lista das colunas que determinam ao menos um par aprovado, no máximo três, **podendo vir com menos de três** — vaga não é preenchida com coluna que não determina nada, senão o desempate por cardinalidade elege justamente a coluna de valores únicos.
 
 - [ ] **Step 1: Escrever os testes, que vão falhar**
 
@@ -1733,12 +1736,17 @@ def perfilar(caminho_sujo, caminho_guia):
             if determinante == determinado:
                 continue
             p = perfilar_par(sujo, determinante, determinado, config.DOMINANCIA_MODA)
-            if p["det"] >= config.DET_MINIMO and p["n_grupos"] >= config.GRUPOS_MINIMOS:
+            if (p["det"] >= config.DET_MINIMO
+                    and p["cobertura"] >= config.COBERTURA_MINIMA
+                    and p["n_grupos"] >= config.GRUPOS_MINIMOS_PAR):
                 pares[(determinante, determinado)] = p
                 quantos_determina[determinante] += 1
 
+    qualificadas = [c for c in sujo.columns if quantos_determina[c] > 0]
+    # Vaga nao e preenchida com coluna que nao determina nada: o desempate por
+    # cardinalidade elegeria justamente a coluna de valores unicos.
     candidatas = sorted(
-        sujo.columns, key=lambda c: (-quantos_determina[c], -colunas[c]["n_distintos"])
+        qualificadas, key=lambda c: (-quantos_determina[c], -colunas[c]["n_distintos"])
     )[:3]
     return Entrada(
         sujo=sujo,

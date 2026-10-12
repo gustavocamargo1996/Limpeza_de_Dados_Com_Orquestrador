@@ -77,6 +77,48 @@ inteira.
 limite do método. Trocar o número depois de ver um resultado ruim seria ajustar
 ao gabarito pela porta dos fundos.
 
+### `DET_MINIMO` é o complemento deste número
+
+`DET_MINIMO = 0.70`: uma dependência entre colunas só vira candidata se valer em
+pelo menos 70% das linhas. **É a mesma premissa de `TETO_MARCACAO`, dita uma vez
+só.** Se o projeto declara não acreditar que uma coluna esteja mais de 30%
+errada, então uma dependência verdadeira não pode falhar em mais de 30% das
+linhas.
+
+A primeira versão usava 0,85, e isso tinha um defeito perverso: a razão de
+determinação cai **justamente porque a coluna tem erro**. No `environment`,
+`City → State` tem razão de 0,82, porque 54 das 300 células de `State` estão
+erradas — e o limiar de 0,85 rejeitava exatamente a dependência que corrigiria
+esses 54 erros. O limiar punia o caso que a regra existe para consertar.
+
+### O suporte se mede em linhas, não em grupos
+
+A primeira versão exigia **dez grupos** de chave repetida (`GRUPOS_MINIMOS = 10`).
+Isso era erro conceitual, e ele zerava a etapa: no `environment`, **nenhum** par
+de colunas passava o filtro, então o tipo `dependencia` — a aposta central de
+recall da POC — nunca dispararia no dataset onde ele importa.
+
+Medido no sujo, sem gabarito, em 12/10/2026:
+
+| Par | Grupos | Linhas cobertas | Razão | Grupos ambíguos | Veredito antigo |
+|---|---|---|---|---|---|
+| `City → State` | 9 | 300 (100%) | 0,820 | 0% | **rejeitado**, por 9 < 10 |
+| `PM2.5 → Climate_Zone` | 3 | 8 (3%) | 0,875 | 33% | rejeitado, por sorte |
+| `Temperature → Climate_Zone` | 46 | 105 (35%) | 0,800 | 41% | **passaria** |
+
+Nove grupos cobrindo a tabela inteira é a evidência mais forte possível, e era
+rejeitada por um grupo. Quarenta e seis grupos cobrindo um terço das linhas, com
+41% deles sem maioria clara, é ruído, e passaria. O critério certo é **quantas
+linhas vivem em grupos com suporte**, não quantos grupos existem:
+`COBERTURA_MINIMA = 0.50` e `GRUPOS_MINIMOS_PAR = 2`.
+
+Com os números novos, sete pares passam no `environment`, todos com ambiguidade
+zero, e `City → State` acusa exatamente **54** células divergentes enquanto
+`City → Climate_Zone` acusa **26** — que são os números de erro reais dessas
+colunas. Essa conferência é **posterior à decisão** e foi feita com a métrica,
+que é ferramenta de validação; ela não escolheu os limiares. O que escolheu foi o
+argumento do complemento, que se sustenta lendo só o `config.py`.
+
 ---
 
 ## O residual é congelado como dicionário {#residual-congelado}

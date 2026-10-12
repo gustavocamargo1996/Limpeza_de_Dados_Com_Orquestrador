@@ -165,11 +165,41 @@ tabela suja**:
 |---|---|
 | razão de determinação | de 0 a 1: quanto o valor da coluna determinante prevê o da determinada |
 | número de grupos com suporte | quantos valores da determinante aparecem em pelo menos duas linhas |
+| **cobertura** | que fração das linhas da tabela vive nesses grupos |
 | células divergentes | quantas células da determinada discordam da maioria do seu grupo |
 | fração de grupos ambíguos | em quantos grupos não existe maioria clara |
 
-Só os pares com razão alta e suporte suficiente vão ao LLM, que dá o veredito
+Só os pares com razão alta e cobertura suficiente vão ao LLM, que dá o veredito
 semântico: essa dependência faz sentido no mundo real?
+
+#### A cobertura, e por que não basta contar grupos
+
+Este é o número que separa evidência de coincidência, e errá-lo custou uma volta
+inteira neste projeto. A primeira versão exigia um mínimo de **grupos**, e isso
+rejeita o forte e aceita o fraco:
+
+| Par | Grupos | Linhas cobertas | Ambíguos |
+|---|---|---|---|
+| `City → State` | 9 | 300, a tabela inteira | 0% |
+| `Temperature → Climate_Zone` | 46 | 105, um terço | 41% |
+
+Nove cidades, cada uma aparecendo umas 33 vezes, são a melhor evidência que uma
+tabela de 300 linhas pode dar sobre uma dependência. Quarenta e seis temperaturas
+distintas, cobrindo um terço das linhas e sem maioria clara em 41% dos grupos,
+são ruído. Contar grupos premiava o segundo e barrava o primeiro.
+
+#### Os dois limiares são a mesma afirmação
+
+A razão de determinação tem de passar de **0,70**, e isso não é um número solto:
+é o complemento do teto de marcação de 30% da seção 5. Se o limpador parte do
+princípio de que nenhuma coluna está mais de 30% errada, então uma dependência
+verdadeira não pode falhar em mais de 30% das linhas. A mesma crença, escrita nos
+dois lugares onde ela tem consequência.
+
+Isso também corrige uma perversidade: **a razão de determinação cai justamente
+porque a coluna tem erro.** `City → State` tem razão de 0,82 porque 54 das 300
+células de `State` estão erradas. Um limiar alto rejeitaria exatamente a regra que
+corrigiria esses 54 erros.
 
 #### A fração de grupos ambíguos, e por que ela salva a POC
 

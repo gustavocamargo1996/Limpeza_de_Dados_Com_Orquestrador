@@ -126,7 +126,9 @@ def _reparar_por_moda(novo, original, coluna, determinantes, alvos, dominancia, 
     for det in determinantes:
         frequencia = original[det].value_counts()
         raros = {v for v, n in frequencia.items() if n == 1}
-        comuns = {v for v, n in frequencia.items() if n >= 2}
+        # Ordem por frequencia e depois alfabetica, para o reparo ser deterministico.
+        ordem = sorted(frequencia.items(), key=lambda par: (-par[1], par[0]))
+        comuns = [v for v, n in ordem if n >= 2]
         for linha in alvos:
             valor = original.at[linha, det]
             if valor not in raros:

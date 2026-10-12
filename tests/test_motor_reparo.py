@@ -175,3 +175,14 @@ def test_vizinho_no_dominio_aceita_distancia_igual_ao_limite(tabela):
 def test_estrategia_desconhecida_falha_alto(tabela):
     with pytest.raises(ValueError):
         reparar(tabela, "zona", "inexistente", {}, verdadeiro_em(tabela, [0]))
+
+
+def test_empate_entre_vizinhos_vai_para_o_primeiro_em_ordem_alfabetica():
+    df = pd.DataFrame(
+        {"cidade": ["Boston"] * 2 + ["Bostan"] * 2 + ["Bostn"], "estado": ["MA"] * 4 + ["XX"]}
+    )
+    novo, _ = reparar(
+        df, "estado", "moda_condicionada", {"determinantes": ["cidade"]},
+        verdadeiro_em(df, [4]),
+    )
+    assert novo.at[4, "cidade"] == "Bostan"

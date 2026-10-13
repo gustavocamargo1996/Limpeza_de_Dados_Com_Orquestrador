@@ -245,9 +245,38 @@ Todo degrau pago é **anunciado ao usuário e aprovado por ele antes de disparar
    vazios) ficaram sem correção. Congelado como invariante:
    `tests/fixtures/limpador_beers_poc2.py`, `tests/fixtures/respostas_beers_poc2.jsonl`
    e `tests/test_invariante.py`; o raciocínio do run está em
-   `docs/evidencia/parte-2/run-beers-2026-10-12/`.
-3. **`environment` com guia e os dois braços sem guia** (cerca de 120 chamadas):
-   aprovado pelo usuário, a rodar em seguida.
+   `docs/evidencia/parte-2/run-beers_2026-10-12_2152/`.
+3. **`environment` com guia e os dois braços sem guia (feito, 12/10/2026).** 68
+   chamadas, sem falha nem truncamento. Medidos com o mesmo holdout do braço com
+   guia, para a base de linhas ser a mesma. "P real" conta também as alterações em
+   colunas sem erro, que a fórmula da POC 1 ignora.
+
+   | Braço | Erros | Corretas | Alterações | P (POC 1) | P real | Recall | F1 real |
+   |---|---|---|---|---|---|---|---|
+   | `beers` com guia | 445 | 438 | 438 + 6 | 100,0% | 98,6% | 98,4% | 98,5% |
+   | `beers` sem guia | 445 | 43 | 51 + 1 | 84,3% | 82,7% | 9,7% | 17,3% |
+   | `environment` com guia | 293 | 217 | 228 | 95,2% | 95,2% | 74,1% | 83,3% |
+   | `environment` sem guia | 293 | 47 | 47 + 47 | 100,0% | 50,0% | 16,0% | 24,3% |
+
+   **O guia vale a maior parte do resultado**: sem ele não há conformidade de
+   schema, e o recall cai de 98,4% para 9,7% no `beers` e de 74,1% para 16,0% no
+   `environment`. No `environment` com guia, `City → State` corrigiu 47 de 47;
+   `Project_Name` (51 erros) ficou em zero, porque a conformidade dela é reprovada.
+   No `environment` sem guia, a moda condicionada "corrigiu" 47 células de `City`,
+   uma coluna sem erro, ao tratar a cidade como determinante com erro de digitação;
+   a fórmula da POC 1 mostra 100% de precisão ali, e a real é 50%.
+
+**Por que `state` não foi corrigido no `beers`.** O erro não é de dependência: é
+valor deslocado. Nas 9 linhas, a sigla foi parar dentro da cidade
+(`city='San Francisco CA'`, `state=''`). Três camadas falharam:
+(a) nenhuma estratégia do catálogo escreve numa coluna a partir de outra, então a
+conformidade de `city` tira o `' CA'` e o descarta; (b) o especificador escolheu
+`moda_condicionada` com determinantes `['brewery-name', 'city']`, e incluir a
+própria `city` corrompida faz cada grupo ter uma linha só, então nada é reparado;
+(c) com `brewery-name` sozinha, a moda acertaria 5 de 9 sem errar nenhuma, mas o
+crivo a reprova por `perde_par_do_guia`, porque os dois pares do guia em `state`
+não são reparados. Diagnóstico feito sem API, com o gabarito, só para entender:
+não pode virar parâmetro da geração.
 
 Depois vem a **medição nas linhas nunca vistas** (700 de `environment` e 2.110 de
 `beers`). Ela fica **fora do plano da parte 2**: exige preparar as fatias a partir

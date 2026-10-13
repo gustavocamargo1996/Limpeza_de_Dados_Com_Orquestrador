@@ -12,14 +12,17 @@ resumida. Leia junto com o `CLAUDE.md` e o `docs/DECISOES.md`.
 
 ---
 
-## 1. O que existe e está em `parte-2-agentes`
+## 1. O que existe e está em `main`
 
-A **parte 2 está implementada e testada com dublê**: os três agentes, o residual,
-a espinha e o CLI de geração. **Nenhuma chamada de API foi feita.** Medido: 16
-arquivos `.py` fora de `tests/` (16 de 16, folga zero), 1.772 linhas no total
-(teto 1.800), e o maior, `limpeza2/e6_codificador.py`, com 200 linhas, exatamente
-no teto. A suíte completa: 282 testes passando. A seção 2 do `CLAUDE.md` declara
-que isto é dois terços da POC 1, e não a metade pedida no começo.
+A **parte 2 está implementada, mesclada em `main` e já rodou com API**: os três
+agentes, o residual, a espinha e o CLI de geração. Medido: 16 arquivos `.py` fora
+de `tests/` (16 de 16, folga zero), 1.798 linhas no total (teto 1.800, folga de 2),
+e o maior, `limpeza2/e6_codificador.py`, com 200 linhas, exatamente no teto. A
+suíte completa: 295 testes passando. A seção 2 do `CLAUDE.md` declara que isto é
+dois terços da POC 1, e não a metade pedida no começo.
+
+**O MVP está guardado** na tag `mvp-poc2-beers` (ver seção 7) e num *bundle* do git
+fora da pasta do projeto, em `../backups/`.
 
 | Arquivo | Função |
 |---|---|
@@ -221,22 +224,35 @@ aparece.
   lista.
 - `limpeza2/__init__.py` foi apagado para abrir a 16ª vaga; não resta vaga livre.
 
-## 7. O que vem depois, em ordem
+## 7. Os runs pagos, e o que vem depois
 
 Todo degrau pago é **anunciado ao usuário e aprovado por ele antes de disparar**.
 
-1. **Sonda, uma só chamada.** Confirma no `gpt-6-luna` com
-   `reasoning_effort="none"` que o schema JSON estrito, `temperature` e `seed` são
-   aceitos.
-2. **`beers` com guia** (cerca de 40 chamadas). Medir; examinar o destino das 31
-   marcas de `brewery-name` pela decomposição por fonte; se o limpador for bom,
-   congelar o invariante: o limpador, o `respostas.jsonl` e dois testes.
-3. **`environment` com guia e os dois braços sem guia** (cerca de 120 chamadas).
+1. **Sonda (feita, 12/10/2026).** Uma chamada: o `gpt-6-luna` com
+   `reasoning_effort="none"` aceitou o schema JSON estrito, `temperature=0` e `seed`.
+   Nenhum plano B foi necessário.
+2. **`beers` com guia (feito, 12/10/2026, o MVP).** 31 chamadas, 38,7 mil tokens,
+   sem falha nem truncamento. Com holdout de 26 linhas: 445 erros, 438 alterações,
+   438 corretas — **precisão 100,0%, recall 98,4%, F1 99,2% pela fórmula da POC 1**.
+   A fórmula não conta alteração em coluna sem erro, e houve 6 assim: 5 em
+   `brewery-name` (`'Base Camp Brewing Co.'` → `'... Co'`) e 1 em `brewery_id`
+   (`95` → `12`, moda condicionada). **Contando-as, precisão 98,6% e F1 98,5%.**
+   Quase todo o recall vem da conformidade de schema (336 por `normalizar`, 101 por
+   `esvaziar`); o residual acertou 1, e as regras propostas pelo detector LLM não
+   acertaram nenhuma célula. Das 31 marcações de `brewery-name`, 26 viraram flag e 5
+   foram reescritas errado — e o especificador justificou "não alterar os nomes
+   marcados" e escolheu `normalizar` assim mesmo. Os 7 erros de `state` (estados
+   vazios) ficaram sem correção. Congelado como invariante:
+   `tests/fixtures/limpador_beers_poc2.py`, `tests/fixtures/respostas_beers_poc2.jsonl`
+   e `tests/test_invariante.py`; o raciocínio do run está em
+   `docs/evidencia/parte-2/run-beers-2026-10-12/`.
+3. **`environment` com guia e os dois braços sem guia** (cerca de 120 chamadas):
+   aprovado pelo usuário, a rodar em seguida.
 
-Depois vem a **medição nas linhas nunca vistas** (700 de `beers` e 2.110 de
-`environment`). Ela fica **fora do plano da parte 2**: exige preparar as fatias a
-partir do arquivo completo, renomeando `beer_name`/`brewery_name` para a grafia com
-hífen, e isso lê o CSV limpo, então tem de morar fora de `limpeza2/`.
+Depois vem a **medição nas linhas nunca vistas** (700 de `environment` e 2.110 de
+`beers`). Ela fica **fora do plano da parte 2**: exige preparar as fatias a partir
+do arquivo completo, renomeando `beer_name`/`brewery_name` para a grafia com hífen,
+e isso lê o CSV limpo, então tem de morar fora de `limpeza2/`.
 
 ## 8. Como o usuário trabalha
 

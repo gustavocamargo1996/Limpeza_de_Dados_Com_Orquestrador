@@ -6,27 +6,11 @@ from limpeza2 import config
 from limpeza2.conformidade import candidatas_de_conformidade
 from limpeza2.e3_crivo import (
     _marca_valor_certificado, _reprovar_reparo, crivar_deteccao, crivar_reparo,
+    crivar_residual,
 )
 from limpeza2.limites import teto_da_coluna
-from limpeza2.tipos import Candidata, Entrada, Perfil, Reparo
-
-
-def monta_entrada(sujo, linhas_guia=(), pares=(), corrigidos=None):
-    """O guia traz o valor do sujo, salvo nas celulas de `corrigidos` {(linha, coluna): valor}."""
-    guia_linhas = sujo.loc[list(linhas_guia)].copy() if linhas_guia else pd.DataFrame(
-        columns=sujo.columns
-    )
-    for (linha, coluna), valor in (corrigidos or {}).items():
-        guia_linhas.at[linha, coluna] = valor
-    guia_pares = pd.DataFrame(
-        list(pares), columns=["linha", "coluna", "sujo", "limpo"]
-    ) if pares else pd.DataFrame(columns=["linha", "coluna", "sujo", "limpo"])
-    return Entrada(
-        sujo=sujo,
-        guia_linhas=guia_linhas,
-        guia_pares=guia_pares,
-        perfil=Perfil(colunas={}, pares={}, candidatas_sujeito=[]),
-    )
+from limpeza2.tipos import Candidata, Reparo, Residual
+from tests.apoio import monta_entrada
 
 
 @pytest.fixture
@@ -141,10 +125,11 @@ def test_entre_variantes_fica_a_que_marca_menos(sujo):
     estreita = candidata("dominio", {"valores": ["MA", "TX", "YY"]})
     sobreviventes = crivar_deteccao([larga, estreita], entrada)
     assert sobreviventes == [estreita]
-    assert larga.metricas["motivo"] == "aprovada"
+    assert (larga.metricas["motivo"], estreita.metricas["motivo"]) == ("superada", "aprovada")
     assert larga.metricas["marcadas"] == 2
     assert estreita.metricas["marcadas"] == 1
     assert crivar_deteccao([estreita, larga], entrada) == [estreita]
+    assert larga.metricas["motivo"] == "superada"
 
 
 def test_reprova_taxa_acima_do_teto_sem_ser_a_coluna_inteira(sujo):
@@ -256,6 +241,20 @@ def test_crivar_reparo_ignora_par_de_outra_coluna(sujo):
 
 
 def test_crivar_reparo_reprova_estrategia_que_lanca(sujo):
+    # A funcao ausente lanca fora da celula, antes de qualquer reparo.
+    entrada = monta_entrada(sujo)
+    c = candidata("dominio", {"valores": ["MA", "TX"]})
+    crivar_deteccao([c], entrada)
+    r = Reparo(
+        candidata=c, estrategia="normalizar", parametros={"funcao": "ausente"},
+        raciocinio="x",
+    )
+    assert crivar_reparo([r], entrada, {}) == []
+    assert c.metricas["motivo_reparo"] == "lancou"
+
+
+def test_crivar_reparo_reprova_funcao_que_lanca_em_toda_celula(sujo):
+    # Ver docs/DECISOES.md#funcao-que-lanca: cada celula vira flag, e sem reparo a regra cai.
     entrada = monta_entrada(sujo)
     c = candidata("dominio", {"valores": ["MA", "TX"]})
     crivar_deteccao([c], entrada)
@@ -266,7 +265,7 @@ def test_crivar_reparo_reprova_estrategia_que_lanca(sujo):
     def explode(valor):
         raise ValueError("falha de proposito")
     assert crivar_reparo([r], entrada, {"explode": explode}) == []
-    assert c.metricas["motivo_reparo"] == "lancou"
+    assert c.metricas["motivo_reparo"] == "nao_repara"
 
 
 def test_crivar_reparo_nao_responde_por_determinante_que_nao_escreveu(sujo):
@@ -548,3 +547,50 @@ def test_conformidade_nunca_marca_celula_nem_valor_certificado():
     c = candidatas_de_conformidade(entrada)[0]
     assert c.parametros == {"padroes": ["9"]}
     assert crivar_deteccao([c], entrada) == [c]
+
+
+def residual(mapa):
+    return Residual(coluna="estado", mapa=dict(mapa), justificativas={s: "j" for s in mapa})
+
+
+def test_residual_que_contradiz_par_do_guia_cai(sujo):
+    entrada = monta_entrada(sujo, pares=[(4, "estado", "XX", "MA")])
+    [r] = crivar_residual([residual({"XX": "TX"})], entrada)
+    assert r.mapa == {}
+    assert r.caidas == {"XX": "contradiz_o_guia"}
+
+
+def test_residual_que_contradiz_celula_suja_do_guia_cai(sujo):
+    entrada = monta_entrada(sujo, linhas_guia=[9], corrigidos={(9, "estado"): "TX"})
+    [r] = crivar_residual([residual({"YY": "MA"})], entrada)
+    assert r.caidas == {"YY": "contradiz_o_guia"}
+
+
+def test_residual_que_troca_valor_certificado_cai(sujo):
+    entrada = monta_entrada(sujo, linhas_guia=[0])
+    [r] = crivar_residual([residual({"MA": "TX"})], entrada)
+    assert r.caidas == {"MA": "valor_certificado"}
+
+
+def test_residual_que_concorda_com_o_guia_fica(sujo):
+    entrada = monta_entrada(sujo, pares=[(4, "estado", "XX", "MA")])
+    [r] = crivar_residual([residual({"XX": "MA"})], entrada)
+    assert r.mapa == {"XX": "MA"} and r.caidas == {}
+
+
+def test_sem_guia_o_residual_passa_inteiro(sujo):
+    [r] = crivar_residual([residual({"XX": "TX", "MA": "TX"})], monta_entrada(sujo))
+    assert r.mapa == {"XX": "TX", "MA": "TX"}
+
+
+def test_recrivar_a_conformidade_so_muda_a_taxa_da_uniao():
+    sujo = pd.DataFrame({"estado": ["MA", "MA", "TX", "TX", "M4", "MA", "TX", "MA", "MA", "Z"]})
+    entrada = monta_entrada(sujo)
+    conformidade = candidata("conformidade", {"padroes": ["A"]})  # marca so "M4"
+    assert crivar_deteccao([conformidade], entrada) == [conformidade]
+    antes = dict(conformidade.metricas)
+    dominio = candidata("dominio", {"valores": ["MA", "TX", "M4"]})  # marca so "Z"
+    crivar_deteccao([conformidade, dominio], entrada)
+    for chave in ("motivo", "marcadas", "taxa", "teto"):
+        assert conformidade.metricas[chave] == antes[chave]
+    assert (antes["taxa_uniao"], conformidade.metricas["taxa_uniao"]) == (0.1, 0.2)

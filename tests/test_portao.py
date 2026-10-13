@@ -45,6 +45,8 @@ def test_aceita_flag_de_re():
         ('def corrigir(valor):\n    __builtins__.clear()\n    return valor\n', "nome dunder proibido"),
         ('def corrigir(valor):\n    return __import__("os")\n', "__import__"),
         ('def limpar(valor):\n    return valor\n', "corrigir"),
+        ('def corrigir(valor):\n    return corrigir(valor[1:]) if valor else valor\n', "recursao proibida"),
+        ('def corrigir(valor):\n    f = corrigir\n    return valor\n', "recursao proibida"),
         ('def corrigir(v):\n    return v\n', "valor"),
         ('def corrigir(*valor):\n    return valor\n', "so-nomeado"),
         ('def corrigir(valor, *, k=1):\n    return valor\n', "so-nomeado"),
@@ -95,6 +97,12 @@ def test_fumaca_pega_falha_em_runtime():
     funcao = materializar('def corrigir(valor):\n    return valor[9]\n')
     with pytest.raises(CodigoRejeitado, match="IndexError"):
         testar_fumaca(funcao, ["ab"])
+
+
+def test_definicao_que_lanca_e_rejeitada_e_nao_escapa():
+    # O valor padrao e avaliado no exec do def: sem a captura, o NameError derrubaria a geracao.
+    with pytest.raises(CodigoRejeitado, match="NameError"):
+        materializar("def corrigir(valor=desconhecida):\n    return valor\n")
 
 
 def test_fumaca_passa_com_funcao_sadia():

@@ -197,15 +197,33 @@ em artefato reexecutável (`HANDOFF.md` §5).
 sujo inédito. Parte do que o limpador sabe é memória, não padrão. Por isso a
 medição acontece em dois lugares e o recall é decomposto por fonte.
 
+**O veto por valor certificado não tem exceção no dicionário.** Na detecção,
+`dependencia` pode marcar valor certificado, porque o erro está no contexto da
+linha (49 das 54 células erradas de `State` carregam valor certificado). No
+dicionário não pode, porque a chave não carrega contexto: na tabela de origem,
+dois `HH` marcados que pedem correções diferentes dão `conflitante`, mas numa
+tabela nova todo `HH` marcado viraria `MA`. Custo: o residual perde o erro
+contextual que tinha correção única na tabela de origem; esse fica para a
+`moda_condicionada`.
+
+**No braço sem guia, o dicionário passa sem filtro.** As três condições de
+`crivar_residual` dependem do guia. É parte do que o braço mede: o residual sem
+supervisão. O que limita o alcance é estrutural: o dicionário só age em célula que
+uma detecção aprovada marcou.
+
+**O domínio de `vizinho_no_dominio` também é memória.** Calculado na tabela de
+geração e congelado como literal, vale para valores já vistos e não cobre valor
+inédito.
+
 ---
 
 ## Uma única implementação da aplicação de regra {#motor-unico}
 
 **Decisão.** `motor.py` é a única implementação. O crivo o importa; o codificador
-copia o texto-fonte dele inteiro para dentro do limpador. O teste que assevera a
-igualdade byte a byte é pendência declarada da parte 2, que escreve o
-codificador; até lá, `tests/test_vazamento.py` só trava os imports do `motor.py`
-em `{"pandas"}`, para o texto copiado não quebrar o limpador entregue.
+copia o texto-fonte dele inteiro para dentro do limpador. A igualdade byte a byte
+é assegurada por `tests/test_e6_codificador.py::test_bloco_embutido_e_motor_byte_a_byte`,
+e `tests/test_vazamento.py` trava os imports do `motor.py` em `{"pandas"}`, para o
+texto copiado não quebrar o limpador entregue.
 
 **Por quê.** Na POC 1 a lógica existia duas vezes, uma na POC e uma cópia
 congelada dentro do limpador, e as duas divergiram. Um run publicou F1 de 100%
@@ -213,8 +231,11 @@ numa coluna em que o limpador entregue marcava zero células. Consertar custou u
 projeto inteiro (lição 8).
 
 **Por que copiar em vez de importar.** O limpador tem de rodar sem depender deste
-repositório. A cópia é mecânica e, na parte 2, será verificada por igualdade, não mantida à
+repositório. A cópia é mecânica e verificada por igualdade (o teste acima), não mantida à
 mão — é isso que a diferencia do defeito da POC 1.
+
+**Ordem de aplicação.** `conformidade` é o primeiro tipo de `TIPOS`: numa célula disputada,
+a regra derivada de dado certificado pelo guia escreve antes da proposta pelo LLM.
 
 ---
 
@@ -391,6 +412,11 @@ o LLM escrever só funções escalares.
 **O limpador gerado roda sem o portão** na máquina do usuário. O cabeçalho dele
 avisa isso.
 
+**O limpador entregue importa o `re` inteiro.** O portão dá ao LLM um proxy de `re`
+com as funções permitidas e as flags; o limpador, que roda sem portão por desenho,
+faz `import re`. Não é inconsistência: o portão protege a geração, e o cabeçalho
+do limpador avisa que ele roda sem portão.
+
 ---
 
 ## O par do guia exige o valor exato {#par-exige-valor-exato}
@@ -418,7 +444,8 @@ tenha escrito: é o mesmo piso do par explícito, com o mesmo motivo
 (`perde_par_do_guia`). Só a coluna **determinante** é poupada quando o reparo não
 escreveu nela. Na **detecção** as células sujas do guia não entram no piso: isso
 exigiria marcar todas e rejeitaria regra que pega só um dos tipos de erro da
-coluna. Pendência da parte 2.
+coluna. É decisão, e não pendência: o piso da detecção em `e3_crivo._reprovar`
+cobre só os pares explícitos do guia.
 
 **O preço.** Mudança de comportamento: estratégias como `esvaziar` e
 `vizinho_no_dominio`, que não alcançam o valor exato do par, passam a ser
@@ -435,7 +462,17 @@ Nunca cai para OpenAI por omissão.
 públicas que não podem sair da rede. Um typo que caísse silenciosamente para
 OpenAI mandaria a tabela do usuário para fora.
 
-**Provedor desta POC.** OpenAI, modelo `gpt-5.6-luna`, nome e chave no `.env`.
+**Provedor desta POC.** OpenAI, modelo `gpt-6-luna` com `reasoning_effort="none"`,
+nome e chave no `.env`. Escolhido em 12/10/2026 por ser o da faixa barata na
+página oficial de comparação da OpenAI nessa data; o `gpt-5.6-luna`, escolhido no
+design, já não aparecia nela e custa o dobro. Raciocínio em `none` porque só assim
+o modelo aceita `temperature` e não gasta tokens ocultos que podem cortar a
+resposta. O terceiro valor de `PROVEDOR`, `gravado`, reproduz um run a partir do
+`respostas.jsonl`.
+
+**Ressalva de método, obrigatória ao reportar.** A POC 1 rodou com `gpt-4o-mini` e
+é somente leitura. Toda comparação com o placar dela muda método e modelo ao mesmo
+tempo; a diferença não se atribui só ao método.
 
 ---
 
@@ -500,3 +537,95 @@ par. `marca_celula_correta` e o veto por valor certificado não disparam por
 construção, já que célula certificada conforma ao schema derivado dela mesma; o
 crivo os mantém ativos para `conformidade` como alarme de que o schema não está
 saindo das células certificadas.
+
+**O corte fica em um terço, com custo conhecido.** `brewery-name` passa a ter
+schema (6 padrões) e a conformidade marca 31 células com precisão 0,000 na
+detecção. Um corte de um quarto a excluiria, mas seria o primeiro limiar do
+projeto escolhido olhando a resposta, e contaminaria a defesa de `TETO_MARCACAO`,
+`DET_MINIMO` e da margem do teto. A métrica é de reparo: marcação que ninguém
+reescreve vira flag e não entra na precisão. No primeiro run mede-se o destino
+das 31, pela decomposição por fonte. **Ideia registrada, não implementada:** o
+que distingue `brewery-name` de `ounces` é a forma dos padrões (`Aa Aa Aa` contra
+`9`); schema com espaço ou muitas alternâncias de classe é texto livre, e isso se
+observa sem gabarito.
+
+---
+
+## Roteamento do detector pela conformidade aprovada {#roteamento-do-detector}
+
+**Decisão.** Na coluna cuja conformidade foi **aprovada pelo crivo**, o detector
+não recebe o tipo `formato`; nas outras, recebe o catálogo inteiro. `dependencia`
+só entra onde a coluna é lado determinado de algum par minerado.
+
+**Por quê.** A conformidade responde "o valor tem a forma certa?" a partir de dado
+certificado, e um `formato` do LLM faria a mesma pergunta com resposta pior; sem o
+portão da união, ele só somaria falso positivo. `dominio`, `faixa` e
+`ausente_disfarcado` perguntam outra coisa (`Freedonia` tem forma de país, `9999`
+conforma a `9`, `0` também) e ficam. O critério é a aprovação, e não ter schema: a
+conformidade de `Project_Name` é reprovada (`perde_par_do_guia`), e com "ter
+schema" a coluna ficaria sem regra de forma nenhuma. A abstenção da conformidade
+vai ao prompt como frase (aprovada, reprovada com motivo, vácua) e orienta sem
+restringir.
+
+---
+
+## Reprodutível dadas as respostas {#determinismo-da-geracao}
+
+**Decisão.** `temperature=0` e `seed` fixa quando o provedor aceita, e cada
+resposta crua gravada em `respostas.jsonl`. `PROVEDOR=gravado` refaz a geração a
+partir dele.
+
+**A origem viaja com as respostas.** O primeiro registro do `respostas.jsonl` é
+`{"origem": {"provedor", "modelo", "esforco"}}`, gravado ao abrir a geração. No
+replay, o cliente lê a origem dali e a regrava no novo arquivo, e o cabeçalho do
+limpador e o `.md` imprimem essa origem, não o `config` corrente. Assim o replay
+reproduz o limpador byte a byte (`tests/test_espinha.py`).
+
+**Por quê.** A geração por LLM não é reprodutível bit a bit, nem com temperatura
+zero. O invariante do `CLAUDE.md` §8 trava o **artefato congelado** e a geração a
+partir das respostas congeladas; diferença entre dois runs pagos não é regressão.
+
+---
+
+## Falha de API tem nome {#falha-de-api}
+
+**Decisão.** O provedor converte o que a API devolve em `FalhaDoLLM` com um de
+cinco motivos: `rede` (tentativas do SDK esgotadas), `cortada`
+(`finish_reason == "length"`, o `LengthFinishReasonError` que quebrou o
+`Eco_Status` na POC 1), `recusada`, `json_invalido` e `teto` (`TETO_CHAMADAS`
+atingido). Cada agente tem um `except FalhaDoLLM`, e a unidade fica sem regra.
+Autenticação e modelo inexistente **não** viram `FalhaDoLLM`: derrubam o run.
+
+**Por quê.** Degradar coluna por coluna gastaria 60 chamadas para descobrir uma
+chave errada. Um run truncado pelo teto carrega a marca no próprio limpador
+(`GERACAO_TRUNCADA`), no `.md` e na saída do `medir.py`.
+
+---
+
+## `reparada` significa "o valor mudou" {#reparada-e-mudanca}
+
+**Decisão.** Em toda estratégia, `reparar` só marca `reparada` onde o valor mudou.
+
+**Por quê.** Antes, `dicionario` com `{v: v}` e `vizinho_no_dominio` que devolvia o
+próprio valor contavam como reparo sem mudar nada, e uma regra assim passaria pelo
+`nao_repara` do crivo. Mudança de comportamento num caso de borda, feita junto com
+a simplificação do `reparar` na parte 2.
+
+---
+
+## A função que lança numa célula vira flag {#funcao-que-lanca}
+
+**Decisão.** Em `motor.reparar`, se a função escalar (`corrigir_<n>`, ou outra
+estratégia escalar) lança numa célula, a célula fica marcada e não reparada, isto
+é, vira flag. A tabela segue. Na geração, o codificador passa a função na fumaça
+com **todos** os valores marcados distintos da tabela de origem, mais os exemplos
+do guia; o prompt continua levando só os `VALORES_NO_PROMPT` primeiros.
+
+**Por quê.** O limpador é aplicado a tabelas novas, e nelas um valor inédito pode
+fazer a função lançar. Derrubar a tabela inteira por uma célula perde tudo o que as
+outras regras corrigiram. Na tabela de origem, a degradação nunca acontece em
+silêncio: a função que lança em algum valor marcado é rejeitada pelo portão antes
+de chegar ao crivo. A fumaça final do limpador continua pegando o que quebra ao
+carregar o módulo. Uma função que lança em **toda** célula marcada não repara nada
+e cai no crivo como `nao_repara`; `lancou` fica para o que lança fora da célula
+(função ausente, coluna inexistente).

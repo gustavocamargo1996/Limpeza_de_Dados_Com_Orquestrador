@@ -19,9 +19,9 @@ def perfilar_coluna(serie):
     return {
         "n_distintos": int(serie.nunique()),
         "n_vazios": int((serie == "").sum()),
-        "frequentes": list(contagem.head(FREQUENTES).items()),
-        "raros": list(contagem.tail(RAROS).items()),
-        "padroes": list(padroes.head(FREQUENTES).items()),
+        "frequentes": [(v, int(n)) for v, n in contagem.head(FREQUENTES).items()],
+        "raros": [(v, int(n)) for v, n in contagem.tail(RAROS).items()],
+        "padroes": [(v, int(n)) for v, n in padroes.head(FREQUENTES).items()],
         "comprimentos": (int(comprimentos.min()), int(comprimentos.max())) if len(serie) else (0, 0),
     }
 

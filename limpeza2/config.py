@@ -31,4 +31,17 @@ VARIANTES_POR_TIPO = 3
 FRACAO_PADROES_SCHEMA = Fraction(1, 3)
 
 PROVEDOR = os.getenv("PROVEDOR", "openai")
-MODELO = os.getenv("MODELO", "gpt-5.6-luna")
+MODELO = os.getenv("MODELO", "gpt-6-luna")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/v1")
+# O respostas.jsonl que PROVEDOR=gravado reproduz.
+RESPOSTAS_GRAVADAS = os.getenv("RESPOSTAS_GRAVADAS", "")
+# So com raciocinio em none o modelo aceita temperature; None tira o parametro do pedido.
+ESFORCO_RACIOCINIO = "none"
+TEMPERATURA = 0
+SAIDA_ESTRITA = True
+TIMEOUT_LLM = 120
+TENTATIVAS_API = 2
+TETO_CHAMADAS = 80
+VALORES_NO_PROMPT = 30
+LINHAS_POR_LOTE = 40
+MAX_LOTES_RESIDUAL = 10

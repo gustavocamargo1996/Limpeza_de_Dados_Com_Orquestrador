@@ -44,25 +44,31 @@ e correção de zero, e os 48 flags dela não valeram nada para o usuário final
 
 ## 2. A ordem das coisas
 
-A geração tem sete etapas. As duas primeiras são **determinísticas, sem LLM** — e
-é na segunda que está a mudança mais importante do projeto.
+A geração segue dez passos, na ordem em que `limpeza2/espinha.py` os chama, e
+nenhum outro lugar guarda essa sequência. O crivo aparece três vezes, porque o
+guia confere a regra que detecta, a que repara e o dicionário. Os dois primeiros
+passos são **determinísticos, sem LLM** — e é no segundo que está a mudança mais
+importante do projeto.
 
-| Etapa | O que faz | Usa LLM? |
+| Passo | O que faz | Usa LLM? |
 |---|---|---|
 | 1. Perfil | lê o CSV sujo como texto literal e calcula estatísticas por coluna e por par de colunas | não |
-| 2. **Conformidade** | deriva o schema de cada coluna das células que o guia certificou, e marca o que não conforma | **não** |
+| 2. **Conformidade e crivo** | deriva o schema de cada coluna das células que o guia certificou, e o crivo decide se essa regra se sustenta | **não** |
 | 3. Detecção | o detector propõe regras para o que a conformidade não cobriu | sim |
-| 4. Crivo | testa cada regra contra a tabela suja e contra o guia, e reprova a maioria | não |
+| 4. Crivo da detecção | testa cada regra contra a tabela suja e contra o guia, reprova a maioria e, entre variantes do mesmo tipo, fica com a que marca menos | não |
 | 5. Especificação | o especificador diz, para cada regra aprovada, como corrigir | sim |
-| 6. Residual | o que nenhuma regra corrigiu vira um dicionário de substituição | sim |
-| 7. Codificação | o codificador escreve o `limpador_*.py` e o relatório de raciocínio | sim |
+| 6. Funções de correção | o codificador escreve, para cada correção do tipo "normalizar", uma função curta que passa pelo portão de segurança | sim |
+| 7. Crivo do reparo | aplica cada correção à tabela suja e reprova a que escreve errado numa célula do guia ou não corrige nada | não |
+| 8. Residual | o que nenhuma regra corrigiu vira um dicionário de substituição | sim |
+| 9. Crivo do residual | tira do dicionário a troca que contradiz o guia ou mexe num valor que o guia mostra correto | não |
+| 10. Arquivos | o codificador escreve o `limpador_*.py` e o relatório de raciocínio, e roda o limpador uma vez para conferir | não |
 
 Depois, numa fase separada que nunca se mistura com a geração, o limpador é
 executado e medido contra o CSV limpo.
 
-**As etapas 3 e de 5 a 7 ainda não existem.** O que está construído e testado são
-as etapas 1, 2 e 4, mais o motor de aplicação de regra, o portão de segurança, o
-sorteio do guia e a medição.
+**Todas as etapas estão implementadas e testadas com um provedor de LLM falso.**
+Nenhum run pago foi feito ainda: os números de qualidade do limpador gerado por
+LLM real não existem.
 
 ---
 
@@ -397,7 +403,7 @@ rodando.
 
 Depois de tudo, sobram células detectadas que nenhuma estratégia soube reparar.
 Na POC anterior elas viravam flag, e é daí que vinha a maior parte do recall
-perdido. A etapa 6 faz uma última tentativa, **na geração**, nunca em execução:
+perdido. O passo 8 faz uma última tentativa, **na geração**, nunca em execução:
 
 1. Junta os **valores distintos** que sobraram, não as células. Cem células com o
    mesmo erro de digitação são um valor, não cem.
@@ -422,6 +428,16 @@ futura que repita aquele valor**, e não faz nada com um valor sujo inédito.
 Isso significa que **parte do que o limpador sabe é memória, não padrão**. Por
 isso a medição acontece em dois lugares e o recall é decomposto por fonte. A
 diferença entre os dois números é o tamanho da memorização, e ela é publicada.
+
+O dicionário não é a única memória. O **domínio** da estratégia
+`vizinho_no_dominio` — os valores da coluna que aparecem duas ou mais vezes sem
+marca, mais os que o guia certifica — também é calculado na tabela de geração e
+congelado no limpador. Numa tabela nova, um valor válido que nunca apareceu na de
+geração não está nele.
+
+No **braço sem guia**, o dicionário entra no limpador sem filtro nenhum: as três
+condições que derrubam uma entrada dependem do guia. Os números desse braço medem,
+entre outras coisas, o residual sem supervisão.
 
 ---
 

@@ -3,7 +3,7 @@ import pandas as pd
 
 NIVEL_SCHEMA = 3
 TIPOS = (
-    "formato", "dominio", "faixa", "ausente_disfarcado", "dependencia", "conformidade"
+    "conformidade", "formato", "dominio", "faixa", "ausente_disfarcado", "dependencia"
 )
 
 
@@ -90,48 +90,39 @@ def distancia_edicao(a, b):
 
 
 def reparar(df, coluna, estrategia, parametros, mascara, funcoes=None, dominancia=0.70):
-    """Aplica a estrategia onde a mascara e True; devolve (df novo, mascara reparada)."""
+    """Aplica a estrategia onde a mascara e True; devolve (df novo, mascara do que mudou)."""
     novo = df.copy()
     reparada = pd.Series(False, index=df.index)
     alvos = df.index[mascara.fillna(False)]
-
-    if estrategia == "normalizar":
-        funcao = (funcoes or {})[parametros["funcao"]]
-        for linha in alvos:
-            novo.at[linha, coluna] = funcao(str(df.at[linha, coluna]))
-            reparada.loc[linha] = novo.at[linha, coluna] != df.at[linha, coluna]
-        return novo, reparada
-
     if estrategia == "moda_condicionada":
         return _reparar_por_moda(
             novo, df, coluna, parametros["determinantes"], alvos, dominancia, reparada
         )
+    escalar = _escalar(estrategia, parametros, funcoes)
+    for linha in alvos:
+        antes = str(df.at[linha, coluna])
+        try:
+            depois = escalar(antes)
+        except Exception:
+            # Degradacao nomeada: a celula fica flag. Ver docs/DECISOES.md#funcao-que-lanca.
+            depois = None
+        # None e "nao sei reparar"; devolver o mesmo valor nao conta como reparo.
+        if depois is not None and depois != antes:
+            novo.at[linha, coluna] = depois
+            reparada.loc[linha] = True
+    return novo, reparada
 
+
+def _escalar(estrategia, parametros, funcoes):
+    """A funcao valor -> valor novo, ou None para nao reparar, de cada estrategia escalar."""
+    if estrategia == "normalizar":
+        return (funcoes or {})[parametros["funcao"]]
     if estrategia == "vizinho_no_dominio":
-        for linha in alvos:
-            vizinho = _mais_proximo(
-                str(df.at[linha, coluna]), parametros["dominio"], parametros["distancia"]
-            )
-            if vizinho is not None:
-                novo.at[linha, coluna] = vizinho
-                reparada.loc[linha] = True
-        return novo, reparada
-
+        return lambda v: _mais_proximo(v, parametros["dominio"], parametros["distancia"])
     if estrategia == "dicionario":
-        mapa = parametros["mapa"]
-        for linha in alvos:
-            valor = str(df.at[linha, coluna])
-            if valor in mapa:
-                novo.at[linha, coluna] = mapa[valor]
-                reparada.loc[linha] = True
-        return novo, reparada
-
+        return parametros["mapa"].get
     if estrategia == "esvaziar":
-        for linha in alvos:
-            novo.at[linha, coluna] = ""
-            reparada.loc[linha] = df.at[linha, coluna] != ""
-        return novo, reparada
-
+        return lambda v: ""
     raise ValueError(f"estrategia de reparo desconhecida: {estrategia}")
 
 
@@ -181,3 +172,26 @@ def _reparar_por_moda(novo, original, coluna, determinantes, alvos, dominancia, 
                 novo.at[linha, coluna] = moda
                 reparada.loc[linha] = True
     return novo, reparada
+
+
+def aplicar_regras(df, regras, residual, funcoes, dominancia=0.70):
+    """Aplica as regras lendo sempre o original; devolve (df novo, flags, fontes)."""
+    novo = df.copy()
+    marcadas = pd.DataFrame(False, index=df.index, columns=df.columns)
+    fontes = pd.DataFrame("", index=df.index, columns=df.columns)
+    for regra in regras:
+        coluna, estrategia = regra["coluna"], regra["estrategia"]
+        mascara = detectar(df, coluna, regra["tipo"], regra["deteccao"], dominancia).fillna(False)
+        marcadas[coluna] = marcadas[coluna] | mascara
+        if estrategia is None:
+            continue
+        reparado, _ = reparar(df, coluna, estrategia, regra["reparo"], mascara, funcoes, dominancia)
+        # Quem escreve primeiro vence; a moda pode escrever tambem no determinante.
+        livre = (reparado != df) & (fontes == "")
+        novo = novo.mask(livre, reparado)
+        fontes = fontes.mask(livre, f"{regra['tipo']}/{estrategia}")
+    for coluna, mapa in residual.items():
+        alvo = marcadas[coluna] & (fontes[coluna] == "") & df[coluna].isin(list(mapa))
+        novo.loc[alvo, coluna] = df.loc[alvo, coluna].map(mapa)
+        fontes.loc[alvo, coluna] = "residual"
+    return novo, marcadas & (fontes == ""), fontes

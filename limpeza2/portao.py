@@ -79,6 +79,10 @@ def validar(codigo, nome_funcao=NOME_FUNCAO, nome_argumento=NOME_ARGUMENTO):
             raise CodigoRejeitado(f"acesso a atributo dunder proibido: {no.attr}")
         if isinstance(no, ast.Name) and no.id.startswith("__"):
             raise CodigoRejeitado(f"nome dunder proibido: {no.id}")
+        if isinstance(no, ast.Name) and no.id == nome_funcao:
+            raise CodigoRejeitado(
+                f"recursao proibida: o corpo nao pode citar '{nome_funcao}', que muda de nome no limpador"
+            )
 
 
 def materializar(codigo, nome_funcao=NOME_FUNCAO, nome_argumento=NOME_ARGUMENTO):
@@ -88,7 +92,10 @@ def materializar(codigo, nome_funcao=NOME_FUNCAO, nome_argumento=NOME_ARGUMENTO)
     # Cada materializacao tem o seu proxy de re: escrita nao atravessa funcoes.
     proxy_re = SimpleNamespace(**{nome: getattr(re, nome) for nome in _NOMES_RE_PERMITIDOS})
     namespace = {"re": proxy_re, "__builtins__": dict(_BUILTINS_PERMITIDOS)}
-    exec(compile(codigo, "<regra-gerada>", "exec"), namespace, namespace)
+    try:
+        exec(compile(codigo, "<regra-gerada>", "exec"), namespace, namespace)
+    except Exception as erro:
+        raise CodigoRejeitado(f"a definicao lancou {type(erro).__name__}: {erro}") from erro
     funcao = namespace.get(nome_funcao)
     if not callable(funcao):
         raise CodigoRejeitado("a funcao nao ficou definida apos a execucao")

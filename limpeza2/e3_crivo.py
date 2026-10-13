@@ -3,14 +3,15 @@ import pandas as pd
 
 from limpeza2 import config
 from limpeza2.limites import (
-    celulas_sujas_do_guia, teto_da_coluna, valores_certificados,
+    celulas_sujas_do_guia, exemplos_do_guia, guia_na_coluna, teto_da_coluna,
+    valores_certificados,
 )
 from limpeza2.motor import detectar, reparar
 
 MOTIVOS = (
     "aprovada", "marca_celula_correta", "vacua", "marca_demais", "perde_par_do_guia",
     "ambigua", "sem_perfil", "lancou", "nao_repara", "corrompe_celula_do_guia",
-    "marca_valor_certificado",
+    "marca_valor_certificado", "superada",
 )
 TIPOS_DE_VALOR = ("formato", "dominio", "faixa", "ausente_disfarcado", "conformidade")
 
@@ -29,6 +30,9 @@ def crivar_deteccao(candidatas, entrada):
     for coluna in {c for c, _ in vencedoras}:
         _gravar_uniao([v for (c, _), v in vencedoras.items() if c == coluna])
     finais = {id(c) for c, _ in vencedoras.values()}
+    for c in candidatas:
+        if c.metricas.get("motivo") == "aprovada" and id(c) not in finais:
+            c.metricas["motivo"] = "superada"
     return [c for c in candidatas if id(c) in finais]
 
 
@@ -107,11 +111,11 @@ def _marca_valor_certificado(entrada, coluna, mascara):
 
 def _celulas_certas(entrada, coluna, mascara):
     """Linhas do guia em que a celula ja estava certa no sujo e a mascara marca."""
-    if coluna not in entrada.guia_linhas.columns:
+    par = guia_na_coluna(entrada, coluna)
+    if par is None:
         return False
-    linhas = entrada.guia_linhas.index.intersection(entrada.sujo.index)
-    certas = entrada.sujo.loc[linhas, coluna] == entrada.guia_linhas.loc[linhas, coluna]
-    return bool(mascara.loc[linhas][certas].any())
+    sujo, certo = par
+    return bool(mascara.loc[sujo.index][sujo == certo].any())
 
 
 def crivar_reparo(propostas, entrada, funcoes=None):
@@ -173,3 +177,20 @@ def _escreveu_errado_no_guia(entrada, novo):
     guia = entrada.guia_linhas.loc[linhas, colunas]
     escreveu = novo.loc[linhas, colunas] != antes
     return bool((escreveu & (novo.loc[linhas, colunas] != guia)).any(axis=None))
+
+
+def crivar_residual(residuais, entrada):
+    """Tira do dicionario a entrada que contradiz o guia ou troca valor que ele certifica."""
+    for residual in residuais:
+        exemplos = exemplos_do_guia(entrada, residual.coluna)
+        certificados = valores_certificados(entrada, residual.coluna)
+        for sujo, limpo in sorted(residual.mapa.items()):
+            if any(s == sujo and c != limpo for s, c in exemplos):
+                residual.caidas[sujo] = "contradiz_o_guia"
+            elif sujo in certificados:
+                # Ver docs/DECISOES.md#residual-congelado: no dicionario o veto nao tem excecao.
+                residual.caidas[sujo] = "valor_certificado"
+            else:
+                continue
+            del residual.mapa[sujo]
+    return residuais

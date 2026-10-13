@@ -7,3 +7,4 @@ raciocinio_*.md
 !tests/fixtures/limpador_*.py
 .superpowers/
 .pytest_cache/
+saida/

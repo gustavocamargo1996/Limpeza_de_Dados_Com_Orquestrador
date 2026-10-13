@@ -80,6 +80,7 @@ def test_faixa_com_limite_infinito_cai(roteiro):
     roteiro(so_na("estado", [
         variante("faixa", minimo=float("inf"), maximo=float("inf")),
         variante("faixa", minimo=float("-inf"), maximo=3),
+        variante("faixa", minimo=0, maximo=10 ** 400),
         variante("faixa", minimo=1, maximo=3),
     ]))
     candidatas = e2_detector.propor(entrada_minima(), [], [])

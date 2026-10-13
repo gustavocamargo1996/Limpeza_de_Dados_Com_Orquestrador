@@ -99,6 +99,12 @@ def test_fumaca_pega_falha_em_runtime():
         testar_fumaca(funcao, ["ab"])
 
 
+def test_definicao_que_lanca_e_rejeitada_e_nao_escapa():
+    # O valor padrao e avaliado no exec do def: sem a captura, o NameError derrubaria a geracao.
+    with pytest.raises(CodigoRejeitado, match="NameError"):
+        materializar("def corrigir(valor=desconhecida):\n    return valor\n")
+
+
 def test_fumaca_passa_com_funcao_sadia():
     testar_fumaca(materializar(VALIDA), ["ab", "", "  X  "])
 

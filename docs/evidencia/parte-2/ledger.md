@@ -82,3 +82,7 @@ Final: parked — e2_detector._valida: math.isfinite lanca OverflowError com int
 Final: parked — motor.reparar captura Exception de toda estrategia escalar, nao so normalizar: bug interno de dicionario/vizinho/esvaziar vira flag silenciosa — Ruling: fica; essas estrategias tem testes proprios e a degradacao e a prometida na spec.
 Final: parked — a chamada modulo.aplicar(...) da fumaca final ficou sem teste que a derrube — Ruling: fica; com a falha por celula virando flag, quase nada chega a ela; o teste de ponta a ponta executa o limpador gerado.
 Final: parked — sob Ollama a origem grava `esforco` de config embora o _Api nao o envie — Ruling: fica; cosmetico no cabecalho, Ollama nao e o provedor desta POC.
+Pos-revisao (pedido do usuario em 12/10/2026): os dois residuais "antes do run pago" foram corrigidos.
+- portao.materializar: o exec do def passa a converter qualquer excecao em CodigoRejeitado ("a definicao lancou ..."), entao o codificador entra no caminho de nova tentativa em vez de derrubar a geracao. Teste: test_portao.py::test_definicao_que_lanca_e_rejeitada_e_nao_escapa. Mutacao (captura so ZeroDivisionError): o teste falha com NameError.
+- e2_detector._valida: limite de faixa tem de caber num float finito (abs(v) <= sys.float_info.max), o que rejeita inf, nan e inteiro gigante sem OverflowError. Teste: o caso maximo=10**400 em test_faixa_com_limite_infinito_cai. Mutacao (condicao trocada por True): o teste falha com OverflowError.
+Suite: 293 passed. Producao: 16 arquivos, 1798 linhas.

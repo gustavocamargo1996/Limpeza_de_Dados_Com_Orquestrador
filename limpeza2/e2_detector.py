@@ -1,5 +1,5 @@
 """Etapa 2: agente detector -> predicados candidatos, uma chamada por coluna."""
-import math
+import sys
 
 from limpeza2 import config, provedor
 from limpeza2.limites import exemplos_do_guia
@@ -127,6 +127,7 @@ def _valida(tipo, parametros):
     if tipo == "faixa":
         minimo, maximo = parametros["minimo"], parametros["maximo"]
         numeros = all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (minimo, maximo))
-        return numeros and math.isfinite(minimo) and math.isfinite(maximo) and minimo <= maximo
+        # O limite tem de caber num float finito: o motor o compara com pd.to_numeric.
+        return numeros and all(abs(v) <= sys.float_info.max for v in (minimo, maximo)) and minimo <= maximo
     (lista,) = parametros.values()
     return isinstance(lista, list) and len(lista) > 0 and all(isinstance(v, str) for v in lista)

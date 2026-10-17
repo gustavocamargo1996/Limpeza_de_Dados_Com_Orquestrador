@@ -7,6 +7,9 @@
 > está em `docs/evidencia/`, e as 43 decisões tomadas durante a execução estão em
 > `docs/evidencia/ledger-das-decisoes.md`.
 
+> **Se a sua tarefa é o orquestrador** descrito em
+> `docs/especificacoes_do_humano/`, comece por `docs/HANDOFF_ORQUESTRADOR.md`.
+
 Escrito para a próxima sessão, e para mim mesmo depois de a conversa ser
 resumida. Leia junto com o `CLAUDE.md` e o `docs/DECISOES.md`.
 

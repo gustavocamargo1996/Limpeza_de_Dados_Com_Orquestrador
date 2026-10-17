@@ -1,0 +1,788 @@
+[
+ {
+  "dataset": "beers",
+  "n": 5,
+  "semente": "s20261011",
+  "precisao": 0.9803921568627451,
+  "recall": 0.9782608695652174,
+  "f1": 0.9793253536452665,
+  "tp": 450,
+  "mudancas": 459,
+  "fp_coluna_limpa": 7,
+  "erros": 460,
+  "chamadas": 33,
+  "truncada": false,
+  "por_coluna": {
+   "style": [
+    0,
+    0,
+    6
+   ],
+   "ounces": [
+    275,
+    274,
+    275
+   ],
+   "abv": [
+    63,
+    63,
+    63
+   ],
+   "ibu": [
+    104,
+    104,
+    104
+   ],
+   "brewery_id": [
+    0,
+    0,
+    1
+   ],
+   "city": [
+    9,
+    9,
+    9
+   ],
+   "state": [
+    9,
+    0,
+    1
+   ]
+  }
+ },
+ {
+  "dataset": "beers",
+  "n": 5,
+  "semente": "s20261012",
+  "precisao": 0.9933920704845814,
+  "recall": 0.9783080260303688,
+  "f1": 0.985792349726776,
+  "tp": 451,
+  "mudancas": 454,
+  "fp_coluna_limpa": 1,
+  "erros": 461,
+  "chamadas": 28,
+  "truncada": false,
+  "por_coluna": {
+   "ounces": [
+    276,
+    275,
+    276
+   ],
+   "abv": [
+    62,
+    62,
+    62
+   ],
+   "ibu": [
+    105,
+    105,
+    105
+   ],
+   "brewery_id": [
+    0,
+    0,
+    1
+   ],
+   "city": [
+    9,
+    9,
+    9
+   ],
+   "state": [
+    9,
+    0,
+    1
+   ]
+  }
+ },
+ {
+  "dataset": "beers",
+  "n": 10,
+  "semente": "s20261011",
+  "precisao": 0.9870410367170627,
+  "recall": 0.9934782608695653,
+  "f1": 0.9902491874322861,
+  "tp": 457,
+  "mudancas": 463,
+  "fp_coluna_limpa": 2,
+  "erros": 460,
+  "chamadas": 30,
+  "truncada": false,
+  "por_coluna": {
+   "ounces": [
+    275,
+    275,
+    275
+   ],
+   "abv": [
+    63,
+    63,
+    63
+   ],
+   "ibu": [
+    104,
+    104,
+    104
+   ],
+   "brewery_id": [
+    0,
+    0,
+    2
+   ],
+   "city": [
+    9,
+    9,
+    9
+   ],
+   "state": [
+    9,
+    6,
+    10
+   ]
+  }
+ },
+ {
+  "dataset": "beers",
+  "n": 10,
+  "semente": "s20261012",
+  "precisao": 0.9713656387665198,
+  "recall": 0.9566160520607375,
+  "f1": 0.9639344262295082,
+  "tp": 441,
+  "mudancas": 454,
+  "fp_coluna_limpa": 1,
+  "erros": 461,
+  "chamadas": 28,
+  "truncada": false,
+  "por_coluna": {
+   "ounces": [
+    276,
+    276,
+    276
+   ],
+   "abv": [
+    62,
+    51,
+    62
+   ],
+   "ibu": [
+    105,
+    105,
+    105
+   ],
+   "brewery_id": [
+    0,
+    0,
+    1
+   ],
+   "city": [
+    9,
+    9,
+    9
+   ],
+   "state": [
+    9,
+    0,
+    1
+   ]
+  }
+ },
+ {
+  "dataset": "beers",
+  "n": 15,
+  "semente": "s20261011",
+  "precisao": 0.9678800856531049,
+  "recall": 0.9826086956521739,
+  "f1": 0.9751887810140237,
+  "tp": 452,
+  "mudancas": 467,
+  "fp_coluna_limpa": 1,
+  "erros": 460,
+  "chamadas": 29,
+  "truncada": false,
+  "por_coluna": {
+   "ounces": [
+    275,
+    274,
+    275
+   ],
+   "abv": [
+    63,
+    63,
+    63
+   ],
+   "ibu": [
+    104,
+    104,
+    109
+   ],
+   "brewery_id": [
+    0,
+    0,
+    1
+   ],
+   "city": [
+    9,
+    9,
+    9
+   ],
+   "state": [
+    9,
+    2,
+    10
+   ]
+  }
+ },
+ {
+  "dataset": "beers",
+  "n": 15,
+  "semente": "s20261012",
+  "precisao": 0.980561555075594,
+  "recall": 0.9848156182212582,
+  "f1": 0.9826839826839827,
+  "tp": 454,
+  "mudancas": 463,
+  "fp_coluna_limpa": 1,
+  "erros": 461,
+  "chamadas": 29,
+  "truncada": false,
+  "por_coluna": {
+   "ounces": [
+    276,
+    276,
+    276
+   ],
+   "abv": [
+    62,
+    62,
+    62
+   ],
+   "ibu": [
+    105,
+    105,
+    105
+   ],
+   "brewery_id": [
+    0,
+    0,
+    1
+   ],
+   "city": [
+    9,
+    9,
+    9
+   ],
+   "state": [
+    9,
+    2,
+    10
+   ]
+  }
+ },
+ {
+  "dataset": "beers",
+  "n": 20,
+  "semente": "s20261011",
+  "precisao": 0.967741935483871,
+  "recall": 0.9782608695652174,
+  "f1": 0.972972972972973,
+  "tp": 450,
+  "mudancas": 465,
+  "fp_coluna_limpa": 7,
+  "erros": 460,
+  "chamadas": 35,
+  "truncada": false,
+  "por_coluna": {
+   "ounces": [
+    275,
+    274,
+    275
+   ],
+   "abv": [
+    63,
+    63,
+    63
+   ],
+   "ibu": [
+    104,
+    104,
+    104
+   ],
+   "brewery_id": [
+    0,
+    0,
+    1
+   ],
+   "brewery-name": [
+    0,
+    0,
+    6
+   ],
+   "city": [
+    9,
+    9,
+    15
+   ],
+   "state": [
+    9,
+    0,
+    1
+   ]
+  }
+ },
+ {
+  "dataset": "beers",
+  "n": 20,
+  "semente": "s20261012",
+  "precisao": 0.9890350877192983,
+  "recall": 0.9783080260303688,
+  "f1": 0.9836423118865868,
+  "tp": 451,
+  "mudancas": 456,
+  "fp_coluna_limpa": 1,
+  "erros": 461,
+  "chamadas": 27,
+  "truncada": false,
+  "por_coluna": {
+   "ounces": [
+    276,
+    275,
+    276
+   ],
+   "abv": [
+    62,
+    62,
+    62
+   ],
+   "ibu": [
+    105,
+    105,
+    107
+   ],
+   "brewery_id": [
+    0,
+    0,
+    1
+   ],
+   "city": [
+    9,
+    9,
+    9
+   ],
+   "state": [
+    9,
+    0,
+    1
+   ]
+  }
+ },
+ {
+  "dataset": "environment",
+  "n": 5,
+  "semente": "s20261011",
+  "precisao": 1.0,
+  "recall": 0.6012658227848101,
+  "f1": 0.75098814229249,
+  "tp": 190,
+  "mudancas": 190,
+  "fp_coluna_limpa": 0,
+  "erros": 316,
+  "chamadas": 25,
+  "truncada": false,
+  "por_coluna": {
+   "State": [
+    52,
+    52,
+    52
+   ],
+   "Climate_Zone": [
+    22,
+    0,
+    0
+   ],
+   "Monitoring_Station_ID": [
+    41,
+    41,
+    41
+   ],
+   "Temperature": [
+    54,
+    54,
+    54
+   ],
+   "Measurement_Date": [
+    43,
+    43,
+    43
+   ],
+   "Project_Name": [
+    55,
+    0,
+    0
+   ],
+   "Eco_Status": [
+    49,
+    0,
+    0
+   ]
+  }
+ },
+ {
+  "dataset": "environment",
+  "n": 5,
+  "semente": "s20261012",
+  "precisao": 0.9065420560747663,
+  "recall": 0.6381578947368421,
+  "f1": 0.749034749034749,
+  "tp": 194,
+  "mudancas": 214,
+  "fp_coluna_limpa": 0,
+  "erros": 304,
+  "chamadas": 29,
+  "truncada": false,
+  "por_coluna": {
+   "State": [
+    48,
+    48,
+    48
+   ],
+   "Climate_Zone": [
+    22,
+    0,
+    0
+   ],
+   "Monitoring_Station_ID": [
+    39,
+    39,
+    39
+   ],
+   "Temperature": [
+    51,
+    51,
+    51
+   ],
+   "Measurement_Date": [
+    43,
+    43,
+    43
+   ],
+   "Project_Name": [
+    54,
+    0,
+    0
+   ],
+   "Eco_Status": [
+    47,
+    13,
+    33
+   ]
+  }
+ },
+ {
+  "dataset": "environment",
+  "n": 10,
+  "semente": "s20261011",
+  "precisao": 0.9629629629629629,
+  "recall": 0.740506329113924,
+  "f1": 0.8372093023255814,
+  "tp": 234,
+  "mudancas": 243,
+  "fp_coluna_limpa": 0,
+  "erros": 316,
+  "chamadas": 30,
+  "truncada": false,
+  "por_coluna": {
+   "State": [
+    52,
+    52,
+    52
+   ],
+   "Climate_Zone": [
+    22,
+    22,
+    22
+   ],
+   "Monitoring_Station_ID": [
+    41,
+    41,
+    41
+   ],
+   "Temperature": [
+    54,
+    54,
+    54
+   ],
+   "Measurement_Date": [
+    43,
+    43,
+    43
+   ],
+   "Project_Name": [
+    55,
+    22,
+    31
+   ],
+   "Eco_Status": [
+    49,
+    0,
+    0
+   ]
+  }
+ },
+ {
+  "dataset": "environment",
+  "n": 10,
+  "semente": "s20261012",
+  "precisao": 0.9631147540983607,
+  "recall": 0.7730263157894737,
+  "f1": 0.8576642335766423,
+  "tp": 235,
+  "mudancas": 244,
+  "fp_coluna_limpa": 0,
+  "erros": 304,
+  "chamadas": 30,
+  "truncada": false,
+  "por_coluna": {
+   "State": [
+    48,
+    48,
+    48
+   ],
+   "Climate_Zone": [
+    22,
+    22,
+    22
+   ],
+   "Monitoring_Station_ID": [
+    39,
+    39,
+    39
+   ],
+   "Temperature": [
+    51,
+    51,
+    51
+   ],
+   "Measurement_Date": [
+    43,
+    43,
+    43
+   ],
+   "Project_Name": [
+    54,
+    32,
+    41
+   ],
+   "Eco_Status": [
+    47,
+    0,
+    0
+   ]
+  }
+ },
+ {
+  "dataset": "environment",
+  "n": 15,
+  "semente": "s20261011",
+  "precisao": 0.9547325102880658,
+  "recall": 0.7341772151898734,
+  "f1": 0.8300536672629697,
+  "tp": 232,
+  "mudancas": 243,
+  "fp_coluna_limpa": 0,
+  "erros": 316,
+  "chamadas": 30,
+  "truncada": false,
+  "por_coluna": {
+   "State": [
+    52,
+    52,
+    52
+   ],
+   "Climate_Zone": [
+    22,
+    22,
+    22
+   ],
+   "Monitoring_Station_ID": [
+    41,
+    41,
+    41
+   ],
+   "Temperature": [
+    54,
+    54,
+    54
+   ],
+   "Measurement_Date": [
+    43,
+    43,
+    43
+   ],
+   "Project_Name": [
+    55,
+    20,
+    31
+   ],
+   "Eco_Status": [
+    49,
+    0,
+    0
+   ]
+  }
+ },
+ {
+  "dataset": "environment",
+  "n": 15,
+  "semente": "s20261012",
+  "precisao": 0.921875,
+  "recall": 0.7763157894736842,
+  "f1": 0.842857142857143,
+  "tp": 236,
+  "mudancas": 256,
+  "fp_coluna_limpa": 0,
+  "erros": 304,
+  "chamadas": 32,
+  "truncada": false,
+  "por_coluna": {
+   "State": [
+    48,
+    48,
+    48
+   ],
+   "Climate_Zone": [
+    22,
+    22,
+    22
+   ],
+   "Monitoring_Station_ID": [
+    39,
+    39,
+    39
+   ],
+   "Temperature": [
+    51,
+    51,
+    51
+   ],
+   "Measurement_Date": [
+    43,
+    43,
+    43
+   ],
+   "Project_Name": [
+    54,
+    21,
+    32
+   ],
+   "Eco_Status": [
+    47,
+    12,
+    21
+   ]
+  }
+ },
+ {
+  "dataset": "environment",
+  "n": 20,
+  "semente": "s20261011",
+  "precisao": 0.9461883408071748,
+  "recall": 0.6677215189873418,
+  "f1": 0.7829313543599259,
+  "tp": 211,
+  "mudancas": 223,
+  "fp_coluna_limpa": 0,
+  "erros": 316,
+  "chamadas": 29,
+  "truncada": false,
+  "por_coluna": {
+   "State": [
+    52,
+    52,
+    52
+   ],
+   "Climate_Zone": [
+    22,
+    0,
+    0
+   ],
+   "Monitoring_Station_ID": [
+    41,
+    41,
+    41
+   ],
+   "Temperature": [
+    54,
+    54,
+    54
+   ],
+   "Measurement_Date": [
+    43,
+    43,
+    43
+   ],
+   "Project_Name": [
+    55,
+    21,
+    33
+   ],
+   "Eco_Status": [
+    49,
+    0,
+    0
+   ]
+  }
+ },
+ {
+  "dataset": "environment",
+  "n": 20,
+  "semente": "s20261012",
+  "precisao": 0.9148936170212766,
+  "recall": 0.7072368421052632,
+  "f1": 0.7977736549165121,
+  "tp": 215,
+  "mudancas": 235,
+  "fp_coluna_limpa": 0,
+  "erros": 304,
+  "chamadas": 30,
+  "truncada": false,
+  "por_coluna": {
+   "State": [
+    48,
+    48,
+    48
+   ],
+   "Climate_Zone": [
+    22,
+    0,
+    0
+   ],
+   "Monitoring_Station_ID": [
+    39,
+    39,
+    39
+   ],
+   "Temperature": [
+    51,
+    51,
+    51
+   ],
+   "Measurement_Date": [
+    43,
+    43,
+    43
+   ],
+   "Project_Name": [
+    54,
+    21,
+    33
+   ],
+   "Eco_Status": [
+    47,
+    13,
+    21
+   ]
+  }
+ }
+]

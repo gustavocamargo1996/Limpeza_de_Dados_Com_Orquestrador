@@ -133,23 +133,40 @@ do orquestrador.
 
 ### 5.2 A amostra-guia (1.2.c): a decisão mais importante
 
-A especificação diz que a amostra-guia é uma "pequena amostra de registros
-considerados corretos" e sugere um formulário com "por exemplo, cinco" linhas.
-Isso tem dois efeitos que você precisa conhecer.
+A amostra-guia é a "pequena amostra de registros considerados corretos" da
+especificação. Duas coisas sobre ela decidem a qualidade do limpador: quantas
+linhas ela tem e de onde elas vêm.
 
-**O número de linhas muda o que o gerador consegue fazer.** A conformidade de
-schema, que responde pela maior parte do recall, só reconhece que uma coluna tem
-schema se os padrões distintos no guia forem no máximo um terço das linhas do
-guia (`config.FRACAO_PADROES_SCHEMA`). Com 20 linhas, cabem até 6 padrões; com 5,
-só 1. Medido em 17/10/2026, sem API:
+**Tamanho: o mínimo razoável é 10 linhas.** Medido em 17/10/2026 com 16 gerações
+reais (`gpt-6-luna`, 2 sementes, guia só com registros corretos, sem pares) e uma
+varredura sem API com 10 sementes. Detalhes em
+`docs/evidencia/parte-2/experimento-tamanho-guia/`.
 
-| Dataset | Conformidade aprovada com 20 linhas | Com 5 linhas |
+| Linhas no guia | `beers` P / R | `environment` P / R |
 |---|---|---|
-| `beers` | `ounces`, `abv`, `ibu`, `brewery-name`, `city`, `state` | `ounces`, `abv`, `state` |
-| `environment` | `Monitoring_Station_ID`, `Temperature`, `Measurement_Date` (e `Project_Name`, sem os pares) | `City`, `Monitoring_Station_ID`, `Measurement_Date` |
+| 5 | 98,7% / 97,8% | 95,3% / **62,0%** |
+| 10 | 97,9% / 97,5% | 96,3% / 75,7% |
+| 15 | 97,4% / 98,4% | 93,8% / 75,5% |
+| 20 | 97,8% / 97,8% | 93,1% / 68,7% |
 
-Só a perda de `ibu` custa 101 dos 445 erros do `beers`. O desenho do gerador
-assume 20 linhas (`config.LINHAS_GUIA = 20`; `CLAUDE.md` §1).
+- **Com 5 linhas, o resultado depende de quais linhas caíram no sorteio.** A
+  conformidade de schema, que responde pela maior parte do recall, só reconhece
+  que uma coluna tem schema se os padrões distintos no guia forem no máximo um
+  terço das linhas (`config.FRACAO_PADROES_SCHEMA`): com 5 linhas, cabe 1 padrão;
+  com 10, cabem 3. No `beers`, as duas sementes de 5 linhas tiveram sorte, mas a
+  varredura mostra que, em uma de dez sementes, só 39% dos erros ficam ao alcance.
+  No `environment`, 5 linhas perdem a `Climate_Zone` e quase toda a
+  `Project_Name`.
+- **De 10 para 20, o ganho fica dentro da variação do LLM.** A queda do
+  `environment` com 20 linhas não vem do tamanho: naqueles dois runs o detector não
+  propôs a dependência `City → Climate_Zone`. Gerações repetidas variam de 5 a 7
+  pontos de recall.
+- **Acima de 20, cresce o risco de falso positivo.** Guias maiores passam a tratar
+  texto livre como schema: `brewery-name` com 25 linhas, `style` com 30.
+
+O desenho do gerador assume 20 linhas (`config.LINHAS_GUIA = 20`). Ele funciona
+com qualquer número, porque o teto de marcação e o corte de schema se ajustam ao
+tamanho do guia.
 
 **De onde vêm as linhas também importa.** O crivo usa o guia de dois jeitos:
 
@@ -162,7 +179,8 @@ assume 20 linhas (`config.LINHAS_GUIA = 20`; `CLAUDE.md` §1).
 
 Linhas digitadas do zero pelo usuário mantêm o primeiro uso e perdem o segundo.
 Por isso a recomendação é que o **template e o formulário venham pré-preenchidos
-com cerca de 20 linhas sorteadas do próprio dataset enviado**. O usuário corrige o
+com linhas sorteadas do próprio dataset enviado: no mínimo 10, idealmente de 10 a
+20**. O usuário corrige o
 que estiver errado, e o orquestrador grava `guia_linhas.csv` com `_linha`
 preservado. Os erros que ele quiser apontar fora dessas linhas vão para
 `guia_pares.csv`. Isso também casa com a restrição da especificação (§1.2.g) de que
@@ -354,9 +372,10 @@ execução (`docs/DECISOES.md#funcao-que-lanca`).
 
 1. **Teto de tamanho:** como ele vale com o orquestrador no mesmo repositório?
    Pode-se adaptar o gerador sem folga de linhas? (seção 7.1)
-2. **Amostra-guia:** pode ser pré-preenchida com cerca de 20 linhas sorteadas do
-   dataset para o usuário corrigir, em vez de 5 linhas digitadas? Os números da
-   seção 5.2 mostram o custo de 5 linhas.
+2. **Amostra-guia:** o tamanho já foi decidido pelo experimento da seção 5.2 (no
+   mínimo 10 linhas). Falta confirmar a origem: as linhas vêm pré-preenchidas,
+   sorteadas do dataset, para o usuário corrigir, ou ele as digita do zero? Digitar
+   do zero perde a comparação por célula, que é a principal defesa de precisão.
 3. **Relatório de geração:** ler o Markdown do raciocínio, ou adaptar o gerador para
    gravar também um JSON?
 4. **Aperfeiçoamento:** a tradução da restrição "não contradizer o guia" pelos

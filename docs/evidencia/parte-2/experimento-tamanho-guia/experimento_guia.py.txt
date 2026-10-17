@@ -1,0 +1,24 @@
+"""Gera limpadores com guias de 5, 10, 15 e 20 linhas (sem pares), duas sementes, dois datasets."""
+import sys, time, traceback
+from pathlib import Path
+import pandas as pd
+from limpeza2 import config
+from limpeza2.espinha import gerar_limpador
+from preparar_guia import sortear
+
+BASE = Path("saida/guia_exp")
+for semente in (20261011, 20261012):
+    for ds in ("beers", "environment"):
+        sujo = pd.read_csv(f"tests/fixtures/{ds}_dirty_300.csv", **config.LER_CSV)
+        limpo = pd.read_csv(f"tests/fixtures/{ds}_clean_300.csv", **config.LER_CSV)
+        for n in (5, 10, 15, 20):
+            nome = f"{ds}_n{n:02d}_s{semente}"
+            guia = BASE / "guias" / nome; guia.mkdir(parents=True, exist_ok=True)
+            linhas, _ = sortear(sujo, limpo, semente, n, 0)
+            linhas.to_csv(guia / "guia_linhas.csv", index=True, index_label="_linha")
+            inicio = time.time()
+            try:
+                gerar_limpador(f"tests/fixtures/{ds}_dirty_300.csv", guia, BASE / nome)
+                print(f"ok {nome} {time.time() - inicio:.0f}s", flush=True)
+            except Exception:
+                print(f"ERRO {nome}", flush=True); traceback.print_exc()

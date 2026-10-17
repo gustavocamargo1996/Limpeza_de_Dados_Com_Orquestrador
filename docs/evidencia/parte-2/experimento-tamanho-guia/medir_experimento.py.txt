@@ -1,0 +1,32 @@
+"""Mede os limpadores do experimento sobre a mesma base: fora as 20 linhas do guia da semente."""
+import json
+from pathlib import Path
+import pandas as pd
+from limpeza2 import config
+from medir import avaliar
+
+BASE = Path("saida/guia_exp")
+print(f"{'run':28s} {'P real':>7s} {'recall':>7s} {'F1':>6s} {'tp':>4s} {'mud':>4s} {'FP col limpa':>12s} {'chamadas':>8s}")
+linhas_tabela = []
+for pasta in sorted(p for p in BASE.iterdir() if p.is_dir() and p.name != "guias"):
+    ds, n, s = pasta.name.split("_")
+    holdout = set(pd.read_csv(BASE / "guias" / f"{ds}_n20_{s}" / "guia_linhas.csv", index_col="_linha").index)
+    lim = next(pasta.glob("limpador_*.py"), None)
+    if lim is None:
+        print(f"{pasta.name:28s} sem limpador"); continue
+    r = avaliar(lim, f"tests/fixtures/{ds}_dirty_300.csv", f"tests/fixtures/{ds}_clean_300.csv", holdout=holdout)
+    t = r["total"]
+    fp = sum(m["mudancas"] for m in r["colunas"].values() if not m["mensuravel"])
+    mud = t["mudancas"] + fp
+    p = t["tp"] / mud if mud else 0.0
+    rec = t["recall"]; f1 = 2 * p * rec / (p + rec) if p + rec else 0.0
+    chamadas = sum(1 for _ in open(pasta / "respostas.jsonl", encoding="utf-8")) - 1
+    print(f"{pasta.name:28s} {p:7.1%} {rec:7.1%} {f1:6.1%} {t['tp']:4d} {mud:4d} {fp:12d} {chamadas:8d}")
+    linhas_tabela.append({"dataset": ds, "n": int(n[1:]), "semente": s, "precisao": p, "recall": rec, "f1": f1,
+                          "tp": t["tp"], "mudancas": mud, "fp_coluna_limpa": fp, "erros": t["erros"], "chamadas": chamadas,
+                          "truncada": r["truncada"], "por_coluna": {c: (m["erros"], m["tp"], m["mudancas"]) for c, m in r["colunas"].items() if m["erros"] or m["mudancas"]}})
+Path(BASE / "resultado.json").write_text(json.dumps(linhas_tabela, indent=1, ensure_ascii=False), encoding="utf-8")
+df = pd.DataFrame(linhas_tabela)
+if not df.empty:
+    print("\nmedia por tamanho:")
+    print(df.groupby(["dataset", "n"])[["precisao", "recall", "f1", "fp_coluna_limpa", "chamadas"]].mean().round(3).to_string())

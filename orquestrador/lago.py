@@ -66,7 +66,8 @@ def listar(prefixo_):
 
 def subpastas(prefixo_):
     """Os nomes das pastas logo abaixo do prefixo, como os carimbos de uma area."""
-    return sorted({chave[len(prefixo_) + 1:].split("/")[0] for chave in listar(prefixo_ + "/")})
+    resto = (chave[len(prefixo_) + 1:] for chave in listar(prefixo_ + "/"))
+    return sorted({nome.split("/")[0] for nome in resto if "/" in nome})
 
 
 def baixar_pasta(prefixo_, pasta):

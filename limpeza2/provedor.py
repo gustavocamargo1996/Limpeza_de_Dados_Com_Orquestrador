@@ -182,6 +182,10 @@ class _Reaproveitar:
         self.gravado, self.vivo, self.origem = gravado, vivo, gravado.origem
 
     def responder(self, chave, instrucao, conteudo, esquema):
-        """A resposta gravada desta chamada ou, sem ela, a da API viva."""
-        api = self.gravado if self.gravado.fila.get(chave) else self.vivo
-        return api.responder(chave, instrucao, conteudo, esquema)
+        """A resposta gravada desta chamada ou, sem ela ou se ela falhou por rede, a da API viva."""
+        if self.gravado.fila.get(chave):
+            bruto = self.gravado.responder(chave, instrucao, conteudo, esquema)
+            # Falha de rede e transitoria: repeti-la congelaria a coluna sem regra para sempre.
+            if not bruto.get("rede"):
+                return bruto
+        return self.vivo.responder(chave, instrucao, conteudo, esquema)

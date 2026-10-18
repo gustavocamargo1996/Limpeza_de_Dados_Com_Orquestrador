@@ -266,3 +266,15 @@ def test_instrucao_numa_regra_aprovada_reespecifica_so_ela(tmp_path, monkeypatch
     assert especificador == e4_especificador.INSTRUCAO
     assert conteudo.endswith("exemplos do guia: nao mude o id")
     assert residual == e5_residual.INSTRUCAO
+
+
+def test_reaproveitar_tenta_de_novo_o_que_falhou_por_rede(tmp_path, monkeypatch):
+    original = provedor.Cliente(tmp_path / "a", em_fila({"rede": True}))
+    with pytest.raises(provedor.FalhaDoLLM):
+        original.pedir_json("detector", "estado", "instrucao", "c1", {})
+    vivo = _reaproveitar(monkeypatch, tmp_path / "a" / "respostas.jsonl",
+                         lambda instrucao, conteudo: {"x": 3})
+    monkeypatch.setattr(config, "MODELO", original.origem["modelo"])
+    copia = provedor.iniciar(tmp_path / "b")
+    assert copia.pedir_json("detector", "estado", "instrucao", "c1", {}) == {"x": 3}
+    assert len(vivo.pedidos) == 1

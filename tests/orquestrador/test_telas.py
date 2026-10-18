@@ -104,6 +104,10 @@ def test_etapa_9_mostra_os_relatorios_e_a_decisao(con, no_guia, monkeypatch):
     assert fluxo.acompanhar(con, processo) == 9
     app = rodar()
     assert [t.label for t in app.tabs] == ["Relatório de geração", "Relatório de limpeza", "Decisão"]
-    assert "Aprovar e gravar o dataset corrigido" in {b.label for b in app.button}
+    aprovar = next(b for b in app.button if b.label == "Aprovar e gravar o dataset corrigido")
+    assert not aprovar.disabled
     assert any("Relatório de limpeza" in m.value for m in app.markdown)
     assert app.expander and app.selectbox
+    controle.atualizar_contexto(con, processo, truncada=True)
+    app = rodar()
+    assert next(b for b in app.button if b.label.startswith("Aprovar")).disabled

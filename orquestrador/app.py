@@ -17,7 +17,7 @@ st.set_page_config(page_title="Orquestrador de limpeza", page_icon=":material/cl
 st.title("Orquestrador de limpeza de dados")
 
 if not lago.disponivel():
-    st.error("Bucket indisponível: rode `.\subir_seaweed.cmd` na raiz do repositório e "
+    st.error("Bucket indisponível: rode `.\\subir_seaweed.cmd` na raiz do repositório e "
              "recarregue a página.", icon=":material/cloud_off:")
     st.stop()
 

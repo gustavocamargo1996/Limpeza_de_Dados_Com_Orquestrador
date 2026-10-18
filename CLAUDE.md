@@ -427,6 +427,7 @@ subir_seaweed.cmd       # sobe o SeaweedFS local (.cmd: roda no PowerShell e no 
 O SeaweedFS sobe com `-master.raftHashicorp`: com o raft padrão ele entra em `panic`
 no Windows ao reabrir o próprio estado (`failed to sync state dir ... Access is
 denied`), da segunda partida em diante.
+Para ver os arquivos do lago no navegador: `http://127.0.0.1:8888/buckets/limpeza/`.
 
 Com `PROVEDOR=openai` no `.env`, **cada geração gasta API e manda linhas da tabela
 para a OpenAI**; a tela de parâmetros avisa antes do botão. Sem gastar nada, a

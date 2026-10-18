@@ -434,7 +434,7 @@ em `C:\Users\gusta\tools\seaweedfs\sonda_orquestrador\`:
   orquestrador nunca passa argumentos por shell.
 
 `subir_seaweed.cmd` roda
-`weed.exe server -dir=<SEAWEED_DADOS> -ip=127.0.0.1 -s3 -s3.port=8333 -master.raftHashicorp`, com
+`weed.exe server -dir=<SEAWEED_DADOS> -ip=127.0.0.1 -s3 -s3.port=8333 -volume.port=9340 -master.raftHashicorp`, com
 `SEAWEED_DADOS` padrão `C:\Users\gusta\tools\seaweedfs\dados_orquestrador`. O bucket é
 criado por `lago.py` no primeiro uso.
 
@@ -572,3 +572,8 @@ Quando o código divergiu da spec, valeu o código, e o motivo está aqui.
   raft de 29/04 (`failed to sync state dir ... Access is denied`), que a sonda não pegou
   porque só subiu pastas novas; `-master.raftHashicorp` o resolve, verificado com duas
   partidas seguidas e com um objeto que sobreviveu à reinicialização.
+- **Volume na porta 9340 (18/10/2026).** A 8080 padrão estava com o Docker (o Airflow de
+  outro projeto). As interfaces web: Filer em `http://127.0.0.1:8888/buckets/limpeza/`,
+  master em `:9333`, volumes em `:9340/ui/index.html`. Com o disco 94,6% cheio, o
+  SeaweedFS limita o servidor a 8 volumes, e cada bucket ocupa 7: cabe só o `limpeza`,
+  o que reforça a regra de um bucket só.

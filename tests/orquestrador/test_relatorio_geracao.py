@@ -64,3 +64,20 @@ def test_montar_destaca_o_que_contradiz_o_guia_e_declara_a_base():
     assert "TRUNCADA" in texto
     assert texto.count("contradiz o guia") >= 4
     assert "## ounces" in texto and "`8.4 ounce` → `8.4`" in texto
+
+
+def test_bloco_de_codigo_nao_vira_campo(tmp_path):
+    md = tmp_path / "r.md"
+    md.write_text("# R\n\n- modelo: m\n\n## a\n\n### formato: aprovada\n\n- parametros: `{'regex': 'x'}`\n"
+                  "- marcadas: 1\n\n```python\n## nao e coluna\n- falso: 1\n```\n\n## b\n", encoding="utf-8")
+    raciocinio = rg.ler(md)
+    assert list(raciocinio["colunas"]) == ["a", "b"]
+    assert raciocinio["colunas"]["a"]["candidatas"][0]["metricas"] == {"marcadas": 1}
+
+
+def test_reparo_que_contradiz_o_guia_conta_como_contradicao():
+    lidas = candidatas(rg.ler(MVP))
+    reparo_errado = [c for c in lidas if c["motivo"] == "aprovada"
+                     and c["metricas"].get("motivo_reparo") == "perde_par_do_guia"]
+    assert len(reparo_errado) == 2 and all(rg.contradiz(c) for c in reparo_errado)
+    assert sum(rg.contradiz(c) for c in lidas) == 6

@@ -42,7 +42,7 @@ orquestrador/
   relatorio_limpeza.py executa o limpador em subprocesso e resume o que ele mudou
   decisoes.py          monta o decisoes.json e recusa o que contradiz o guia
   config.py            endpoint, bucket, caminho do SQLite, tamanhos padrao
-subir_seaweed.sh       sobe o SeaweedFS com os argumentos certos (nao e Python)
+subir_seaweed.cmd      sobe o SeaweedFS com os argumentos certos (nao e Python)
 var/                   SQLite e pastas de trabalho; ignorada pelo git
 ```
 
@@ -433,8 +433,8 @@ em `C:\Users\gusta\tools\seaweedfs\sonda_orquestrador\`:
 - O PowerShell quebra `-ip=127.0.0.1`; por isso o script de partida é Bash e o
   orquestrador nunca passa argumentos por shell.
 
-`subir_seaweed.sh` roda
-`weed.exe server -dir=<SEAWEED_DADOS> -ip=127.0.0.1 -s3 -s3.port=8333`, com
+`subir_seaweed.cmd` roda
+`weed.exe server -dir=<SEAWEED_DADOS> -ip=127.0.0.1 -s3 -s3.port=8333 -master.raftHashicorp`, com
 `SEAWEED_DADOS` padrão `C:\Users\gusta\tools\seaweedfs\dados_orquestrador`. O bucket é
 criado por `lago.py` no primeiro uso.
 
@@ -455,7 +455,7 @@ testes.
 | Filho do gerador sai com erro | etapa `concluido com erro`; o fim do stderr vai a `erro.log` no bucket e ao painel; botão "tentar de novo" |
 | Geração passa de `TIMEOUT_GERACAO` | o filho é encerrado; etapa com erro, motivo "timeout" |
 | App reabre com etapa `em andamento` cujo `PID` não existe | etapa vira `concluido com erro`, motivo "interrompido"; "tentar de novo" |
-| SeaweedFS fora do ar | verificado na abertura; aviso "bucket indisponível: rode `subir_seaweed.sh`"; ingestão bloqueada; **sem gravação local de reserva** |
+| SeaweedFS fora do ar | verificado na abertura; aviso "bucket indisponível: rode `subir_seaweed.cmd`"; ingestão bloqueada; **sem gravação local de reserva** |
 | Dataset vazio, com coluna repetida ou com coluna começando por `_` | recusado no upload, com o motivo |
 | Extração com sha256 já ingerido no mesmo esquema | aviso com a data da ingestão anterior; o processo pode seguir, sem gravar o original de novo |
 | Template do guia com colunas ou `_linha` divergentes | recusado, com a lista do que diverge |
@@ -565,3 +565,10 @@ Quando o código divergiu da spec, valeu o código, e o motivo está aqui.
     como chamada nova.
   - Aperfeiçoar só reprova a versão depois de a nova geração subir.
   - Cada processamento ganha a sua linha em `DADOS`, mesmo com o hash repetido.
+- **`subir_seaweed.cmd` no lugar de `subir_seaweed.sh` (18/10/2026),** achado pelo
+  usuário ao rodar: no PowerShell, `bash` é o Bash do WSL, que não entende caminhos
+  `/c/...` e falha com `mkdir: Permission denied`. O `.cmd` não quebra `-ip=127.0.0.1` e
+  roda no PowerShell e no `cmd`. Ao testá-lo, a segunda partida reproduziu o `panic` do
+  raft de 29/04 (`failed to sync state dir ... Access is denied`), que a sonda não pegou
+  porque só subiu pastas novas; `-master.raftHashicorp` o resolve, verificado com duas
+  partidas seguidas e com um objeto que sobreviveu à reinicialização.

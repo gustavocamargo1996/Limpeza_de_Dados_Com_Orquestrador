@@ -413,16 +413,20 @@ orquestrador/
   fluxo.py              # a ordem das etapas do processo e as transicoes entre elas
   app.py                # ponto de entrada do Streamlit: escolhe a tela pelo estado
   tela_ingestao.py, tela_guia.py, tela_painel.py, tela_resultado.py
-subir_seaweed.sh        # sobe o SeaweedFS local (Bash; o PowerShell quebra -ip=127.0.0.1)
+subir_seaweed.cmd       # sobe o SeaweedFS local (.cmd: roda no PowerShell e no cmd)
 .streamlit/config.toml  # o app escuta so em 127.0.0.1, sem estatistica de uso
 ```
 
 **Como rodar**, da raiz do repositório:
 
-```bash
-bash subir_seaweed.sh                         # num terminal; S3 em 127.0.0.1:8333
-.venv/Scripts/streamlit run orquestrador/app.py
+```powershell
+.\subir_seaweed.cmd                            # num terminal; S3 em 127.0.0.1:8333
+.venv\Scripts\streamlit run orquestradorpp.py  # noutro terminal
 ```
+
+O SeaweedFS sobe com `-master.raftHashicorp`: com o raft padrão ele entra em `panic`
+no Windows ao reabrir o próprio estado (`failed to sync state dir ... Access is
+denied`), da segunda partida em diante.
 
 Com `PROVEDOR=openai` no `.env`, **cada geração gasta API e manda linhas da tabela
 para a OpenAI**; a tela de parâmetros avisa antes do botão. Sem gastar nada, a

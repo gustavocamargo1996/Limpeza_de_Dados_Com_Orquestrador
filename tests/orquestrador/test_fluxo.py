@@ -22,6 +22,11 @@ VERSAO_MVP = "2026-10-12_2152"
 MODA_DO_ID = ("brewery_id", "dependencia")
 
 
+def limpador(con, id_limpador):
+    """A linha da versao do limpador, para conferir status e origem."""
+    return dict(con.execute("SELECT * FROM LIMPADORES WHERE ID_LIMPADOR = ?", (id_limpador,)).fetchone())
+
+
 def ler(caminho):
     return pd.read_csv(caminho, **config.LER_CSV)
 
@@ -90,7 +95,7 @@ def test_1_esquema_novo_gera_o_limpador_do_mvp_byte_a_byte(mvp, tmp_path):
     assert [e["ID_ETAPA"] for e in etapas] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
     assert all(e["STATUS"] == controle.SUCESSO for e in etapas[:-1])
     ctx = controle.contexto(con, processo)
-    assert controle.obter_limpador(con, ctx["id_limpador"])["STATUS_APROVACAO"] == "pendente"
+    assert limpador(con, ctx["id_limpador"])["STATUS_APROVACAO"] == "pendente"
 
 
 def test_1b_relatorio_de_limpeza_bate_com_o_limpador(mvp):
@@ -116,8 +121,8 @@ def test_2_aperfeicoar_rejeitando_a_moda_do_id_sem_chamada_nova(mvp, tmp_path):
     fluxo.aperfeicoar(con, processo, [decisoes.decidir(regra, "brewery_id", "rejeitar", None, "v1")])
     assert esperar(con, processo) == 9, controle.etapa_atual(con, processo)["DETALHE"]
     ctx = controle.contexto(con, processo)
-    assert controle.obter_limpador(con, anterior)["STATUS_APROVACAO"] == "reprovado"
-    novo = controle.obter_limpador(con, ctx["id_limpador"])
+    assert limpador(con, anterior)["STATUS_APROVACAO"] == "reprovado"
+    novo = limpador(con, ctx["id_limpador"])
     assert (novo["STATUS_APROVACAO"], novo["ID_LIMPADOR_ORIGEM"]) == ("pendente", anterior)
     baixado = lago.baixar_pasta(novo["DIRETORIO_BUCKET"], tmp_path / "v2")
     regras = importar(baixado / "limpador_beers_2026-10-12_2300.py").REGRAS
@@ -134,7 +139,7 @@ def test_3_aprovar_grava_o_corrigido_e_encerra(mvp):
     ctx = controle.contexto(con, processo)
     corrigido = "Outros/beers/Corrigido/2026-10-13_0800"
     assert lago.listar(corrigido) == [f"{corrigido}/{n}" for n in ("dados.csv", "flags.csv", "relatorio_limpeza.md")]
-    assert controle.obter_limpador(con, ctx["id_limpador"])["STATUS_APROVACAO"] == "aprovado"
+    assert limpador(con, ctx["id_limpador"])["STATUS_APROVACAO"] == "aprovado"
     dado = controle.dado_existente(con, "Outros", "beers", ctx["hash"])
     assert (dado["DIRETORIO_CORRIGIDO"], dado["LIMPADOR_UTILIZADO"]) == (corrigido, "beers_2026-10-12_2300")
     assert controle.processo_aberto(con) is None

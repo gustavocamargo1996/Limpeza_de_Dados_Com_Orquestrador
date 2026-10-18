@@ -14,6 +14,11 @@ CAMPOS_DA_ESPECIFICACAO = {
 }
 
 
+def limpador(con, id_limpador):
+    """A linha da versao do limpador, para conferir status e origem."""
+    return dict(con.execute("SELECT * FROM LIMPADORES WHERE ID_LIMPADOR = ?", (id_limpador,)).fetchone())
+
+
 def test_as_cinco_tabelas_tem_os_campos_da_especificacao(con):
     for tabela, campos in CAMPOS_DA_ESPECIFICACAO.items():
         existentes = {linha[1] for linha in con.execute(f"PRAGMA table_info({tabela})")}
@@ -75,7 +80,7 @@ def test_limpador_aprovado_e_o_mais_recente_aprovado(con):
     controle.mudar_status(con, b, "aprovado")
     aprovado = controle.limpador_aprovado(con, "Outros", "beers")
     assert (aprovado["ID_LIMPADOR"], aprovado["ID_LIMPADOR_ORIGEM"]) == (b, a)
-    assert controle.obter_limpador(con, b)["STATUS_APROVACAO"] == "aprovado"
+    assert limpador(con, b)["STATUS_APROVACAO"] == "aprovado"
 
 
 def test_dado_registrado_e_concluido(con):

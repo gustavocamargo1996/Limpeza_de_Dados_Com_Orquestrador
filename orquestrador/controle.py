@@ -172,11 +172,6 @@ def mudar_status(con, id_limpador, status):
                 (status, id_limpador))
 
 
-def obter_limpador(con, id_limpador):
-    """A linha da versao do limpador."""
-    return _um(con, "SELECT * FROM LIMPADORES WHERE ID_LIMPADOR = ?", id_limpador)
-
-
 def limpador_aprovado(con, dominio, nome):
     """A versao aprovada mais recente do esquema, ou None."""
     return _um(con, "SELECT * FROM LIMPADORES WHERE DOMINIO = ? AND NOME_ESQUEMA = ? AND "

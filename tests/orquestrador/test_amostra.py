@@ -130,3 +130,15 @@ def test_esquema_conhecido_poe_as_linhas_antigas_na_frente(tmp_path):
     pares = ler(tmp_path / "entrada" / "guia" / "guia_pares.csv")
     for posicao, velho in zip(pares["linha"].astype(int), ler(GUIA_MVP / "guia_pares.csv")["linha"].astype(int)):
         assert entrada.loc[posicao].equals(sujo.loc[velho])
+
+
+def test_celula_apagada_no_formulario_vira_vazio(tmp_path):
+    # Guarda de regressao: no pandas 3 passa tambem sem o fillna; morde no pandas 2.
+    sujo = ler(SUJO)
+    sorteio = amostra.sortear(len(sujo), 10, 7)
+    guia = amostra.template(sujo, sorteio).astype(object)
+    guia.loc[0, "ibu"] = None
+    pares = pd.DataFrame([{"linha": 12, "coluna": "ibu", "sujo": "N/A", "limpo": None}])
+    amostra.gravar_guia(tmp_path, guia, pares, sujo, sorteio)
+    assert ler(tmp_path / "guia_linhas.csv").loc[0, "ibu"] == ""
+    assert ler(tmp_path / "guia_pares.csv").loc[0, "limpo"] == ""

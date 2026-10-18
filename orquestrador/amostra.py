@@ -73,8 +73,9 @@ def gravar_guia(pasta, guia, pares, sujo, sorteio):
     """Grava os quatro arquivos da Amostra_Guia, preservando a ordem das linhas."""
     pasta = Path(pasta)
     pasta.mkdir(parents=True, exist_ok=True)
-    guia = guia[["_linha", *sujo.columns]].astype(str)
-    pares = pares[COLUNAS_PARES].astype(str)
+    # Celula apagada no formulario chega nula; no pandas 2, astype(str) a gravaria "None".
+    guia = guia[["_linha", *sujo.columns]].astype(object).fillna("").astype(str)
+    pares = pares[COLUNAS_PARES].astype(object).fillna("").astype(str)
     guia.to_csv(pasta / "guia_linhas.csv", index=False)
     pares.to_csv(pasta / "guia_pares.csv", index=False)
     citadas = sorted({int(v) for v in guia["_linha"]} | {int(v) for v in pares["linha"]})

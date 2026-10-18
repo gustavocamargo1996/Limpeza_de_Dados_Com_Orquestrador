@@ -35,6 +35,7 @@ def test_pastas_irmas_nao_se_misturam(lago_falso, tmp_path):
     (tmp_path / "f.txt").write_text("1")
     lago.enviar(tmp_path / "f.txt", "Outros/beers/Limpador/t1/f.txt")
     lago.enviar(tmp_path / "f.txt", "Outros/beers/Limpador/t10/f.txt")
+    lago.enviar(tmp_path / "f.txt", "Outros/beers/Limpador/t1x.txt")
     assert [p.name for p in lago.baixar_pasta("Outros/beers/Limpador/t1", tmp_path / "b").iterdir()] == ["f.txt"]
     assert lago.subpastas("Outros/beers/Limpador") == ["t1", "t10"]
 

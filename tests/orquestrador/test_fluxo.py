@@ -153,10 +153,10 @@ def test_4_esquema_conhecido_aplica_o_limpador_aprovado_sem_gerar(mvp):
     mvp["conhecido"] = processo
 
 
-def test_4b_nova_versao_usa_o_guia_antigo_renumerado_e_herda_as_regras(mvp):
-    con, processo, mp = mvp["con"], mvp["conhecido"], mvp["mp"]
+def test_4b_nova_versao_usa_o_guia_antigo_renumerado_e_herda_as_regras(mvp, monkeypatch):
+    con, processo = mvp["con"], mvp["conhecido"]
     mvp["relogio"]["agora"] = "2026-10-14_0900"
-    mp.setattr(fluxo.geracao, "disparar", lambda *a, **k: type("P", (), {"pid": 999999})())
+    monkeypatch.setattr(fluxo.geracao, "disparar", lambda *a, **k: type("P", (), {"pid": 999999})())
     fluxo.nova_versao(con, processo, "inteira", 300)
     ctx = controle.contexto(con, processo)
     entrada = Path(ctx["pasta_versao"]) / "entrada"

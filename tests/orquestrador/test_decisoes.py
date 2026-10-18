@@ -79,3 +79,12 @@ def test_gravar_e_ler(tmp_path):
     decisoes.gravar(tmp_path, d)
     assert decisoes.ler(tmp_path) == d
     assert decisoes.ler(tmp_path / "nada") == []
+
+
+def test_heranca_nao_apaga_a_instrucao_que_o_usuario_deu_antes():
+    regra = {"coluna": "ibu", "tipo": "faixa", "deteccao": {"minimo": 0, "maximo": 9}}
+    anterior = decisoes.decidir(cand("aprovada", "codigo_rejeitado", tipo="faixa",
+                                     parametros={"minimo": 0, "maximo": 9}),
+                                "ibu", "tentar", "use int", "v0")
+    [junta] = decisoes.acumular([anterior], [], regras=[regra], versao="v1")
+    assert (junta["instrucao"], junta["origem"], junta["versao"]) == ("use int", "usuario", "v0")

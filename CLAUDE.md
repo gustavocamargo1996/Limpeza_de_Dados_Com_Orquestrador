@@ -151,6 +151,13 @@ O crivo ganhou o motivo `rejeitada_pelo_usuario`, a prioridade da regra aprovada
 o veto do residual; o provedor ganhou o modo `reaproveitar` e suas duas travas.
 Nada foi refatorado para caber, por decisão do usuário.
 
+**O orquestrador também passou do orçamento que eu propus (18/10/2026):** fechou
+em **15 arquivos e 1.530 linhas**, contra 14 e 1.400, com o maior em 200
+(`fluxo.py` e `controle.py`). O 15º arquivo veio de separar `automaticas.py`
+(as etapas que o sistema faz sozinho) de `fluxo.py` (as transições), pela
+função: o `fluxo.py` único tinha 294 linhas. As linhas a mais estão nas cinco
+telas, que eu tinha estimado por baixo.
+
 Meça antes de todo commit que acrescenta código:
 
 ```bash
@@ -383,3 +390,57 @@ rodar comando que escreva lá.
 por subprocesso, chamando `limpeza2.espinha.gerar_limpador`, e nenhum módulo de
 `limpeza2/` pode importar algo de `orquestrador/`. O gerador continua funcionando
 sozinho, pela linha de comando de sempre.
+
+---
+
+## 11. O orquestrador
+
+Spec: `docs/superpowers/specs/2026-10-17-orquestrador-design.md`; plano:
+`docs/superpowers/plans/2026-10-17-orquestrador.md`. As regras das seções 5, 7 e
+8 valem para ele; o teto da seção 2 tem orçamento próprio.
+
+```
+orquestrador/
+  config.py             # endpoint, bucket, caminhos e tamanhos padrao
+  controle.py           # le e grava os metadados no SQLite (tabelas da especificacao + CONTEXTOS)
+  lago.py               # le e grava artefatos no bucket S3, no layout da especificacao
+  amostra.py            # sorteia, valida e renumera a amostra-guia e a amostra de geracao
+  geracao.py            # roda o gerador em subprocesso e informa a etapa corrente
+  relatorio_geracao.py  # le o raciocinio do gerador e o traduz para o usuario
+  relatorio_limpeza.py  # executa o limpador em subprocesso e resume o que ele mudou
+  decisoes.py           # monta o decisoes.json e recusa o que contradiz o guia
+  automaticas.py        # executa as etapas que o sistema faz sozinho (2, 3 conhecido, 7, 8)
+  fluxo.py              # a ordem das etapas do processo e as transicoes entre elas
+  app.py                # ponto de entrada do Streamlit: escolhe a tela pelo estado
+  tela_ingestao.py, tela_guia.py, tela_painel.py, tela_resultado.py
+subir_seaweed.sh        # sobe o SeaweedFS local (Bash; o PowerShell quebra -ip=127.0.0.1)
+.streamlit/config.toml  # o app escuta so em 127.0.0.1, sem estatistica de uso
+```
+
+**Como rodar**, da raiz do repositório:
+
+```bash
+bash subir_seaweed.sh                         # num terminal; S3 em 127.0.0.1:8333
+.venv/Scripts/streamlit run orquestrador/app.py
+```
+
+Com `PROVEDOR=openai` no `.env`, **cada geração gasta API e manda linhas da tabela
+para a OpenAI**; a tela de parâmetros avisa antes do botão. Sem gastar nada, a
+interface pode ser percorrida até os parâmetros da geração. A geração com
+`PROVEDOR=gravado` só funciona se os prompts forem idênticos aos gravados, isto é,
+com o mesmo guia das respostas, e o sorteio da interface não reproduz as linhas do
+guia do MVP: o percurso offline completo, da ingestão à aprovação, está em
+`tests/orquestrador/test_fluxo.py`.
+
+**A fronteira** (`tests/orquestrador/test_fronteira.py`): nenhum módulo de
+`orquestrador/` importa `limpeza2`, salvo `limpeza2.espinha` dentro do filho de
+`geracao.py`; nenhum importa `medir` nem `preparar_guia`; nenhum módulo de
+`limpeza2/` importa `orquestrador`. O limpador gerado também só roda em
+subprocesso (`relatorio_limpeza.py`), porque as funções escritas por LLM rodam ali
+sem o portão.
+
+**O invariante do orquestrador** (`tests/orquestrador/test_fluxo.py`): o fluxo
+inteiro sobre o MVP, offline, versiona no bucket o limpador byte a byte igual a
+`tests/fixtures/limpador_beers_poc2.py`; rejeitar a moda de `brewery_id` gera uma
+versão com 30 respostas reaproveitadas e zero chamadas novas.
+

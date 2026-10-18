@@ -506,3 +506,41 @@ por mutação (`CLAUDE.md` §8).
 - **Run pago.** Toda geração real é anunciada na tela (seção 6.3). Durante o
   desenvolvimento, nenhum run real é disparado sem anúncio ao usuário e aprovação
   (`CLAUDE.md` §8).
+
+## 16. O que a implementação mudou neste desenho (18/10/2026)
+
+Quando o código divergiu da spec, valeu o código, e o motivo está aqui.
+
+- **15 arquivos, não 14.** `fluxo.py` saiu com 294 linhas e foi separado pela função:
+  `automaticas.py` executa as etapas que o sistema faz sozinho (2, 3 do esquema
+  conhecido, 7 e 8, e o registro de erro) e `fluxo.py` guarda as transições que o
+  usuário dispara. O orquestrador fechou em 1.530 linhas (orçamento: 1.400). Declarado
+  no `CLAUDE.md` §2.
+- **Uma sexta tabela, `CONTEXTOS`** (`ID_PROCESSO`, `CONTEXTO` em JSON, `ENCERRADO`):
+  é o estado de cada processo que as etapas seguintes leem (caminhos, versão, sorteio,
+  parâmetros). `PROCESSOS` continua com uma linha por etapa; `ID_PROCESSO` vem de
+  `CONTEXTOS`.
+- **Etapa pulada é registrada.** Se a geração passa de uma etapa a outra entre duas
+  consultas do painel, a intermediária ganha a linha dela em `PROCESSOS`, com duração
+  quase zero, em vez de sumir do histórico.
+- **O residual roda depois do codificador** na espinha; por isso a última chamada
+  gravada é do residual e a etapa observada pode voltar de 6 para 5. O fluxo só anda
+  para a frente.
+- **`lago.disponivel` usa `head_bucket`.** Com acesso anônimo, o SeaweedFS responde a
+  `list_buckets` com lista vazia; a primeira versão dizia "bucket indisponível" na
+  segunda abertura do app. Achado no teste de integração com o SeaweedFS real.
+- **`.streamlit/config.toml`** faz o app escutar só em `127.0.0.1` e desliga a
+  estatística de uso: o padrão do Streamlit escutava na rede local e anunciava URL
+  externa.
+- **`cancelar` não apaga a pasta de trabalho.** Tudo o que importa está no lago;
+  apagar não era necessário.
+- **A origem de cada linha da entrada** (`parametros.json`) usa `fonte: "dados"` para
+  as linhas da extração do processo e `fonte: "guia"` para as linhas sujas antigas.
+- **Gerador:** o estouro previsto se confirmou e foi declarado: 1.875 linhas (teto
+  1.850) e `e3_crivo.py` com 211 (teto 200). Rejeitar a regra vencedora de um
+  `(coluna, tipo)` deixa a variante seguinte vencer
+  (`docs/DECISOES.md#decisoes-do-usuario`).
+- **Percurso offline pela interface:** com `PROVEDOR=gravado` a geração só funciona com
+  o mesmo guia das respostas gravadas, e o sorteio da interface não o reproduz. O
+  percurso offline completo está nos testes (`tests/orquestrador/test_fluxo.py`), e
+  foi repetido contra o SeaweedFS real, fora da suíte.

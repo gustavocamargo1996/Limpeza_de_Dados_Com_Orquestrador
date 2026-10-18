@@ -1,4 +1,5 @@
 """Etapa 1: perfila a tabela suja, lida como texto literal."""
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -78,7 +79,16 @@ def perfilar(caminho_sujo, caminho_guia):
         guia_linhas=guia_linhas,
         guia_pares=guia_pares,
         perfil=Perfil(colunas=colunas, pares=pares, candidatas_sujeito=candidatas),
+        decisoes=_ler_decisoes(caminho_guia),
     )
+
+
+def _ler_decisoes(caminho_guia):
+    """As decisoes do usuario no decisoes.json da pasta do guia; sem arquivo, lista vazia."""
+    arquivo = Path(caminho_guia) / "decisoes.json" if caminho_guia is not None else None
+    if arquivo is None or not arquivo.exists():
+        return []
+    return json.loads(arquivo.read_text(encoding="utf-8"))
 
 
 def _ler_guia(caminho_guia, colunas):

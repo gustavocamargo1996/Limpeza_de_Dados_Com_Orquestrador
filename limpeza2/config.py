@@ -35,6 +35,8 @@ MODELO = os.getenv("MODELO", "gpt-6-luna")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/v1")
 # O respostas.jsonl que PROVEDOR=gravado reproduz.
 RESPOSTAS_GRAVADAS = os.getenv("RESPOSTAS_GRAVADAS", "")
+# A API que PROVEDOR=reaproveitar chama para o que nao tem resposta gravada.
+PROVEDOR_VIVO = os.getenv("PROVEDOR_VIVO", "")
 # So com raciocinio em none o modelo aceita temperature; None tira o parametro do pedido.
 ESFORCO_RACIOCINIO = "none"
 TEMPERATURA = 0

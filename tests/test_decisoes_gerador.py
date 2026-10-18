@@ -3,13 +3,14 @@ import json
 import shutil
 
 import pandas as pd
+import pytest
 
-from limpeza2 import config, e2_detector, e4_especificador
+from limpeza2 import config, e2_detector, e4_especificador, provedor
 from limpeza2.e1_perfil import perfilar
 from limpeza2.e3_crivo import crivar_deteccao, crivar_residual
 from limpeza2.espinha import gerar_limpador
 from limpeza2.tipos import Candidata, Residual
-from tests.apoio import monta_entrada
+from tests.apoio import CORTADA, Roteiro, em_fila, monta_entrada, ok
 from tests.test_e2_detector import entrada_minima, so_na, variante
 from tests.test_invariante import FIXTURES, GUIA, PASTA_DO_RUN, SUJO, sem_cr
 
@@ -176,3 +177,54 @@ def test_sem_instrucao_o_prompt_do_especificador_nao_muda():
          "decisao": "aprovar", "instrucao": None}
     assert _conteudo_com([d]) == _conteudo_com([])
     assert "instrucao do usuario" not in _conteudo_com([])
+
+
+# --- PROVEDOR=reaproveitar -----------------------------------------------------------------
+
+RESPOSTAS_MVP = FIXTURES / "respostas_beers_poc2.jsonl"
+
+
+def _reaproveitar(monkeypatch, gravadas, responder=None):
+    """Liga o modo reaproveitar com uma API viva de mentira; devolve o roteiro dela."""
+    vivo = Roteiro(responder or (lambda instrucao, conteudo: CORTADA))
+    monkeypatch.setattr(config, "PROVEDOR", "reaproveitar")
+    monkeypatch.setattr(config, "RESPOSTAS_GRAVADAS", str(gravadas))
+    monkeypatch.setattr(config, "MODELO", "gpt-6-luna")
+    monkeypatch.setattr(provedor, "_api_viva", lambda nome: vivo)
+    return vivo
+
+
+def test_reaproveitar_reproduz_o_mvp_sem_chamar_a_api_viva(tmp_path, monkeypatch):
+    vivo = _reaproveitar(monkeypatch, RESPOSTAS_MVP)
+    caminho = gerar_limpador(SUJO, GUIA, tmp_path / PASTA_DO_RUN)
+    assert sem_cr(caminho) == sem_cr(FIXTURES / "limpador_beers_poc2.py")
+    assert vivo.pedidos == []
+
+
+def test_reaproveitar_chama_a_api_viva_so_para_o_que_falta(tmp_path, monkeypatch):
+    original = provedor.Cliente(tmp_path / "a", em_fila(ok({"x": 1})))
+    original.pedir_json("detector", "estado", "instrucao", "c1", {})
+    vivo = _reaproveitar(monkeypatch, tmp_path / "a" / "respostas.jsonl",
+                         lambda instrucao, conteudo: {"x": 2})
+    monkeypatch.setattr(config, "MODELO", original.origem["modelo"])
+    copia = provedor.iniciar(tmp_path / "b")
+    assert copia.pedir_json("detector", "estado", "instrucao", "c1", {}) == {"x": 1}
+    assert copia.pedir_json("detector", "estado", "instrucao", "c2", {}) == {"x": 2}
+    assert [conteudo for _, conteudo in vivo.pedidos] == ["c2"]
+    gravadas = (tmp_path / "b" / "respostas.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(gravadas) == 3 and json.loads(gravadas[0]) == {"origem": original.origem}
+
+
+def test_reaproveitar_com_provedor_vivo_desconhecido_falha_alto(monkeypatch):
+    monkeypatch.setattr(config, "PROVEDOR", "reaproveitar")
+    monkeypatch.setattr(config, "RESPOSTAS_GRAVADAS", str(RESPOSTAS_MVP))
+    monkeypatch.setattr(config, "PROVEDOR_VIVO", "opneai")
+    with pytest.raises(ValueError, match="PROVEDOR_VIVO='opneai'.*Nao caio para openai"):
+        provedor._construir_api()
+
+
+def test_reaproveitar_com_modelo_diferente_do_gravado_falha_alto(monkeypatch):
+    _reaproveitar(monkeypatch, RESPOSTAS_MVP)
+    monkeypatch.setattr(config, "MODELO", "outro-modelo")
+    with pytest.raises(ValueError, match="difere do gravado"):
+        provedor._construir_api()

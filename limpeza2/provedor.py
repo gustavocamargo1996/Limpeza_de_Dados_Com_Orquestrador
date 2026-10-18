@@ -37,14 +37,27 @@ def cliente():
 def _construir_api():
     """A API do provedor em config.PROVEDOR; valor desconhecido levanta."""
     provedor = config.PROVEDOR.strip().lower()
+    if provedor in ("openai", "ollama"):
+        return _api_viva(provedor)
+    if provedor == "gravado":
+        return _Gravado(Path(config.RESPOSTAS_GRAVADAS))
+    if provedor == "reaproveitar":
+        return _Reaproveitar(_Gravado(Path(config.RESPOSTAS_GRAVADAS)),
+                             _api_viva(config.PROVEDOR_VIVO.strip().lower()))
+    raise ValueError(
+        f"PROVEDOR={provedor!r} nao e suportado. Use openai, ollama, gravado ou reaproveitar. "
+        "Nao caio para openai em silencio: isso mandaria dado para fora da rede."
+    )
+
+
+def _api_viva(provedor):
+    """A API de rede de `provedor`; so openai e ollama existem."""
     if provedor == "openai":
         return _Api(esforco=config.ESFORCO_RACIOCINIO)
     if provedor == "ollama":
         return _Api(esforco=None, base_url=config.OLLAMA_URL, api_key="ollama")
-    if provedor == "gravado":
-        return _Gravado(Path(config.RESPOSTAS_GRAVADAS))
     raise ValueError(
-        f"PROVEDOR={provedor!r} nao e suportado. Use openai, ollama ou gravado. "
+        f"PROVEDOR_VIVO={provedor!r} nao e suportado. Use openai ou ollama. "
         "Nao caio para openai em silencio: isso mandaria dado para fora da rede."
     )
 
@@ -156,3 +169,19 @@ class _Gravado:
         if not self.fila.get(chave):
             raise KeyError(f"resposta nao gravada para a chamada {chave}")
         return self.fila[chave].pop(0)
+
+
+class _Reaproveitar:
+    """Responde do respostas.jsonl gravado e chama a API viva so para o que falta."""
+
+    def __init__(self, gravado, vivo):
+        modelo = (gravado.origem or {}).get("modelo")
+        if modelo != config.MODELO:
+            raise ValueError(f"MODELO={config.MODELO!r} difere do gravado {modelo!r}: "
+                             "uma versao com respostas de dois modelos seria inexplicavel")
+        self.gravado, self.vivo, self.origem = gravado, vivo, gravado.origem
+
+    def responder(self, chave, instrucao, conteudo, esquema):
+        """A resposta gravada desta chamada ou, sem ela, a da API viva."""
+        api = self.gravado if self.gravado.fila.get(chave) else self.vivo
+        return api.responder(chave, instrucao, conteudo, esquema)

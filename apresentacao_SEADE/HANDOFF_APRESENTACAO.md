@@ -40,9 +40,9 @@ Regras da entrega:
 2. `apresentacao_SEADE/especificacao_apresentacao.excalidraw`: o desenho dos 10 slides.
    É JSON. Leia só os elementos com `"isDeleted": false`; os textos estão em
    `originalText`. A seção 4 abaixo já traz a transcrição, mas confira no original.
-   **Abra também as imagens `apresentacao_SEADE/layout_excalidraw/slide01.png` a
-   `slide10.png`**: são o desenho de cada slide, com a disposição dos blocos que o usuário
-   quer (seção 4.1).
+   **Abra também `apresentacao_SEADE/layout_excalidraw/visao_geral_excalidraw.png`**: é o
+   desenho inteiro, renderizado pela própria biblioteca do Excalidraw, com os 10 slides e
+   a disposição dos blocos que o usuário quer (seção 4.1).
 3. `Qualificacao_Mestrado_Gustavo_Camargo.pdf` (raiz do repositório, 91 páginas; leia
    com `pages`):
    - Resumo, p. 5;
@@ -119,10 +119,14 @@ dos colegas) falam dos mesmos pilares: confira lá para usar o mesmo vocabulári
 O Excalidraw não traz só o conteúdo: **a posição e o tamanho de cada bloco são a
 sugestão do usuário para a disposição no slide**. Siga essa disposição.
 
-- **Veja antes de montar:** `apresentacao_SEADE/layout_excalidraw/slide01.png` a
-  `slide10.png` são os 10 quadros do Excalidraw desenhados como imagem: os blocos nas
-  posições e proporções do desenho, a faixa verde do título e as setas em vermelho (a
-  bolinha marca a ponta). Abra cada PNG com a ferramenta de leitura de imagem.
+- **Veja antes de montar:**
+  - `apresentacao_SEADE/layout_excalidraw/visao_geral_excalidraw.png` (4360 × 3794): **a
+    renderização fiel**, feita pela biblioteca do Excalidraw, com os 10 slides numa grade
+    de três por linha. É a referência visual principal. Como a imagem é grande, a leitura
+    a reduz; para ver um slide em detalhe, recorte-o com Pillow.
+  - `slide01.png` a `slide10.png`, na mesma pasta: um PNG por slide, desenhado com Pillow
+    a partir das coordenadas do JSON (aproximação, com as setas em vermelho e a bolinha na
+    ponta). Servem para ver um slide sozinho.
 - **Posições prontas:** `apresentacao_SEADE/layout_excalidraw/posicoes.md` dá, para cada
   bloco, x, y, largura e altura **em polegadas do slide**. A área útil do quadro (abaixo da
   faixa de título) foi mapeada na área do placeholder de corpo do layout `2_1 conteúdo`,
@@ -311,8 +315,18 @@ Da raiz do repositório, no PowerShell:
 
 - **Skill de PowerPoint:** já disponível nesta instalação (`anthropic-skills:pptx` ou
   `pptx`). Carregue-a antes de editar o `.pptx`.
-- **Excalidraw:** o arquivo é JSON e se lê direto, sem skill. O usuário **autorizou
-  instalar** uma skill de PowerPoint ou de Excalidraw se for preciso.
+- **Excalidraw:** o arquivo é JSON e se lê direto, sem skill. Para **renderizar** um
+  `.excalidraw` em PNG ou SVG com o visual real, há um script no projeto `oye` do usuário
+  (não é uma skill):
+  `C:\Users\gusta\projects\oye\docs\apresentacao_integracoes_e_projeto_de_base_de_dados\_build\render_excalidraw.py`.
+  Rode-o **de dentro dessa pasta**:
+  `python render_excalidraw.py <arquivo.excalidraw> <saida.png|saida.svg> [escala]`.
+  Ele usa o Edge sem janela (`msedge.exe`, instalado) e baixa a biblioteca do Excalidraw de
+  `esm.sh`, então precisa de internet; o desenho não sai da máquina. Leva uns 13 s e gera
+  **uma imagem com a cena inteira**. Para renderizar só um slide, copie o `.excalidraw` e
+  apague os elementos dos outros quadros. **Não edite nada no projeto `oye`**: use o script
+  como está, gravando a saída fora dele. Se precisar de uma skill de Excalidraw ou de
+  PowerPoint além disso, o usuário **autorizou instalar**.
 - **`python-pptx`, `openpyxl`, `pypdf`, `Pillow`:** use com `uv run --no-project --with
   <pacote>` para não mexer no `.venv` do projeto.
 - **Renderização dos slides em imagem:** o LibreOffice **não está instalado**. Sem ele,

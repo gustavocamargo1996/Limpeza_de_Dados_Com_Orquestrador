@@ -88,3 +88,16 @@ def test_heranca_nao_apaga_a_instrucao_que_o_usuario_deu_antes():
                                 "ibu", "tentar", "use int", "v0")
     [junta] = decisoes.acumular([anterior], [], regras=[regra], versao="v1")
     assert (junta["instrucao"], junta["origem"], junta["versao"]) == ("use int", "usuario", "v0")
+
+
+def test_regras_do_limpador_lidas_pela_ast_sem_executar(tmp_path):
+    import importlib.util
+    from pathlib import Path
+    fixture = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "limpador_beers_poc2.py"
+    spec = importlib.util.spec_from_file_location("limpador_regras", fixture)
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    assert decisoes.regras_do_limpador(fixture) == modulo.REGRAS
+    bomba = tmp_path / "limpador_bomba.py"
+    bomba.write_text("raise SystemExit('executou')\nREGRAS = [{'coluna': 'a'}]\n", encoding="utf-8")
+    assert decisoes.regras_do_limpador(bomba) == [{"coluna": "a"}]

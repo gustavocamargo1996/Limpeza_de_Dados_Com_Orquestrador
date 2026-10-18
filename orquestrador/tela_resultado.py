@@ -25,7 +25,7 @@ def mostrar(con, processo):
     with geracao_aba:
         st.markdown(_texto(Path(ctx["destino"]) / "relatorio_geracao.md", "Sem relatório de geração."))
     with limpeza_aba:
-        st.markdown(_texto(Path(ctx.get("corrigido", ".")) / "relatorio_limpeza.md",
+        st.markdown(_texto(Path(ctx.get("corrigido") or ".") / "relatorio_limpeza.md",
                            "Sem relatório de limpeza."))
     with decisao_aba:
         _decidir(con, processo, ctx, aplicada=atual["STATUS"] != ERRO)

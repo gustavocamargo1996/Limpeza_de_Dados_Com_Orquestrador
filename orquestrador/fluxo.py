@@ -1,36 +1,18 @@
 """A ordem das etapas do processo e as transicoes entre elas, gravadas no SQLite."""
-import csv
 import hashlib
-import io
 from datetime import datetime
 from pathlib import Path
 
-import pandas as pd
+from botocore.exceptions import BotoCoreError, ClientError
 
 from orquestrador import amostra, automaticas, config, controle, decisoes, geracao, lago
 from orquestrador.automaticas import ESPERA_NOME, ESPERA_PARAMETROS
 from orquestrador.controle import ANDAMENTO, ERRO, SUCESSO
 
 
-def _ler_dataset(conteudo):
-    """O dataset enviado, ou ValueError com o motivo da recusa."""
-    try:
-        cabecalho = next(csv.reader(io.StringIO(conteudo.decode("utf-8-sig"))), [])
-        sujo = pd.read_csv(io.BytesIO(conteudo), **config.LER_CSV)
-    except (UnicodeDecodeError, pd.errors.ParserError, pd.errors.EmptyDataError) as erro:
-        raise ValueError(f"o arquivo nao e um CSV legivel em UTF-8: {erro}") from erro
-    if len(set(cabecalho)) != len(cabecalho):
-        raise ValueError("o dataset tem nomes de coluna repetidos")
-    if any(c.startswith("_") for c in cabecalho):
-        raise ValueError("coluna comecando por _ conflita com a coluna _linha do guia")
-    if sujo.empty:
-        raise ValueError("o dataset nao tem linhas")
-    return sujo
-
-
 def iniciar(con, conteudo, nome_arquivo, dominio):
     """Etapa 1: le o dataset, abre o processo e identifica o esquema."""
-    sujo = _ler_dataset(conteudo)
+    sujo = amostra.ler_dataset(conteudo)
     processo = controle.abrir_processo(con, {
         "inicio": controle.agora(), "dominio": dominio, "nome_arquivo": nome_arquivo,
         "hash": hashlib.sha256(conteudo).hexdigest(), "campos": sorted(sujo.columns),
@@ -119,6 +101,7 @@ def gerar(con, processo, base, tamanho, decisoes_=None, reaproveitar=None):
     controle.atualizar_contexto(
         con, processo, versao=versao, versao_em=versao_em, pasta_versao=str(pasta),
         destino=str(destino), pid=filho.pid, parametros=parametros, gerou=True,
+        corrigido=None, truncada=False,
         geracao={"base": base, "tamanho": tamanho, "decisoes": decisoes_ or [],
                  "reaproveitar": str(reaproveitar) if reaproveitar else None,
                  "inicio": datetime.now().timestamp()})
@@ -132,7 +115,7 @@ def acompanhar(con, processo):
         return atual["ID_ETAPA"]
     ctx = controle.contexto(con, processo)
     destino, pid = Path(ctx["destino"]), ctx["pid"]
-    situacao = geracao.situacao(destino, pid)
+    situacao = geracao.situacao(destino, pid, ctx["geracao"]["inicio"])
     if situacao == "rodando":
         if datetime.now().timestamp() - ctx["geracao"]["inicio"] > config.TIMEOUT_GERACAO:
             geracao.encerrar(pid)
@@ -145,7 +128,11 @@ def acompanhar(con, processo):
     if situacao == "erro":
         motivo = geracao.erro(destino) or "interrompido: o gerador parou sem deixar log"
         return automaticas.falhar(con, processo, motivo)
-    automaticas.versionar(con, processo)
+    try:
+        automaticas.versionar(con, processo)
+    except (BotoCoreError, ClientError, OSError, ValueError) as erro:
+        # Degradacao nomeada: o lago ou um arquivo falhou; a etapa 7 fica com erro.
+        return automaticas.falhar(con, processo, f"{type(erro).__name__}: {erro}")
     return automaticas.aplicar(con, processo)
 
 
@@ -154,6 +141,9 @@ def aprovar(con, processo):
     ctx = controle.contexto(con, processo)
     if ctx.get("truncada"):
         raise ValueError("geracao truncada pelo teto de chamadas nao pode ser aprovada")
+    atual = controle.etapa_atual(con, processo)
+    if (atual["ID_ETAPA"], atual["STATUS"]) != (9, ANDAMENTO):
+        raise ValueError("so a versao aplicada ao dataset, na etapa 9, pode ser aprovada")
     controle.iniciar_etapa(con, processo, 10)
     prefixo = lago.prefixo(ctx["dominio"], ctx["esquema"], "Corrigido", automaticas.carimbo())
     lago.enviar_pasta(ctx["corrigido"], prefixo, ["dados.csv", "flags.csv", "relatorio_limpeza.md"])
@@ -166,16 +156,19 @@ def aprovar(con, processo):
 def aperfeicoar(con, processo, novas):
     """Etapa 9 para a 4: reprova a versao e gera outra com as decisoes, reaproveitando respostas."""
     ctx = controle.contexto(con, processo)
-    controle.mudar_status(con, ctx["id_limpador"], "reprovado")
     g = ctx["geracao"]
     gerar(con, processo, g["base"], g["tamanho"], decisoes.acumular(g["decisoes"], novas),
           Path(ctx["destino"]) / "respostas.jsonl")
+    # So depois de a nova geracao subir: se ela falha antes, a versao continua decidivel.
+    controle.mudar_status(con, ctx["id_limpador"], "reprovado")
 
 
 def nova_versao(con, processo, base, tamanho):
     """Etapa 9 para a 4 no esquema conhecido, com as regras aprovadas e o guia da 1a ingestao."""
     ctx = controle.contexto(con, processo)
-    herdadas = decisoes.acumular(decisoes.ler(ctx["destino"]), [], regras=ctx["regras"],
+    # REGRAS lidas do arquivo, e nao da aplicacao: a aplicacao pode ter falhado.
+    regras = decisoes.regras_do_limpador(Path(ctx["destino"]) / f"limpador_{ctx['versao']}.py")
+    herdadas = decisoes.acumular(decisoes.ler(ctx["destino"]), [], regras=regras,
                                  versao=ctx["versao"])
     if not ctx.get("guia"):
         automaticas.guia_do_esquema(con, processo)
@@ -191,10 +184,10 @@ def tentar_de_novo(con, processo):
 
 def cancelar(con, processo):
     """Encerra o processo; o filho do gerador, se roda, e encerrado junto."""
-    ctx = controle.contexto(con, processo)
-    if ctx.get("pid") and geracao.vivo(ctx["pid"]):
+    ctx, atual = controle.contexto(con, processo), controle.etapa_atual(con, processo)
+    gerando = atual and atual["ID_ETAPA"] in (4, 5, 6) and atual["STATUS"] == ANDAMENTO
+    if gerando and geracao.vivo(ctx["pid"], ctx["geracao"]["inicio"]):
         geracao.encerrar(ctx["pid"])
-    atual = controle.etapa_atual(con, processo)
     if atual and atual["STATUS"] == ANDAMENTO:
         controle.concluir_etapa(con, processo, ERRO, "cancelado pelo usuario")
     controle.encerrar_processo(con, processo)

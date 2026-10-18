@@ -1,4 +1,5 @@
 """Monta o decisoes.json do guia e recusa a decisao que contradiz o guia."""
+import ast
 import json
 from pathlib import Path
 
@@ -68,3 +69,11 @@ def gravar(pasta, decisoes):
     Path(pasta).mkdir(parents=True, exist_ok=True)
     (Path(pasta) / "decisoes.json").write_text(
         json.dumps(decisoes, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def regras_do_limpador(caminho):
+    """A lista REGRAS de um limpador gerado, lida pela AST, sem executar o arquivo."""
+    for no in ast.parse(Path(caminho).read_text(encoding="utf-8")).body:
+        if isinstance(no, ast.Assign) and [getattr(a, "id", None) for a in no.targets] == ["REGRAS"]:
+            return ast.literal_eval(no.value)
+    return []

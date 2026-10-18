@@ -56,6 +56,8 @@ def _guia(con, processo, ctx):
                            "guia_template.csv", "text/csv", icon=":material/download:")
         enviado = st.file_uploader("Enviar o template corrigido", type="csv")
     st.subheader("Erros fora destas linhas (opcional)")
+    st.caption("Indique a linha, a coluna e o valor certo. Deixar o valor certo em branco "
+               "diz que o certo é vazio, como num N/A que deve sumir.")
     pares = st.data_editor(
         pd.DataFrame({"linha": pd.Series(dtype="Int64"), "coluna": pd.Series(dtype="object"),
                       "limpo": pd.Series(dtype="object")}),

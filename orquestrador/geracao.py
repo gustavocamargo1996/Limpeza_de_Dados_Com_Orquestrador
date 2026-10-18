@@ -12,13 +12,17 @@ from orquestrador import config
 ETAPA_DO_REGISTRO = {"detector": 4, "especificador": 5, "residual": 5, "codificador": 6}
 SUCESSO = "limpador: "
 AINDA_ATIVO = 259
+# 1601-01-01 em intervalos de 100 ns antes de 1970-01-01, a origem do FILETIME.
+EPOCA_DO_WINDOWS = 116444736000000000
 
 
 def ambiente(reaproveitar=None):
     """O ambiente do filho; com `reaproveitar`, as respostas gravadas e a API viva."""
     env = dict(os.environ)
     if reaproveitar is not None:
-        vivo = env.get("PROVEDOR_VIVO") or env.get("PROVEDOR", "openai")
+        provedor = env.get("PROVEDOR", "openai")
+        # A API viva e a que a tela anuncia; PROVEDOR_VIVO so vale com PROVEDOR=gravado.
+        vivo = env.get("PROVEDOR_VIVO", "") if provedor == "gravado" else provedor
         env.update(PROVEDOR="reaproveitar", RESPOSTAS_GRAVADAS=str(reaproveitar),
                    PROVEDOR_VIVO=vivo)
     return env
@@ -65,7 +69,9 @@ def etapa_corrente(destino):
 def chamadas(destino, anterior=None):
     """(total, novas): as chamadas gravadas e as que nao tinham resposta em `anterior`."""
     chaves = [r["chave"] for r in _registros(Path(destino) / "respostas.jsonl")]
-    gravadas = Counter(r["chave"] for r in _registros(anterior)) if anterior else Counter()
+    # Falha de rede gravada vai de novo a API viva: conta como chamada nova.
+    gravadas = Counter(r["chave"] for r in _registros(anterior)
+                       if not r.get("bruto", {}).get("rede")) if anterior else Counter()
     novas = 0
     for chave in chaves:
         if gravadas[chave]:
@@ -75,8 +81,8 @@ def chamadas(destino, anterior=None):
     return len(chaves), novas
 
 
-def vivo(pid):
-    """O processo `pid` ainda roda; no Windows, pelo codigo de saida do OpenProcess."""
+def vivo(pid, nascido=None):
+    """O processo `pid` ainda roda e, com `nascido`, foi criado ate um minuto antes ou depois."""
     if os.name != "nt":
         return Path(f"/proc/{pid}").exists()
     # Nunca os.kill(pid, 0): no Windows o sinal 0 e CTRL_C_EVENT.
@@ -84,10 +90,13 @@ def vivo(pid):
     alca = kernel.OpenProcess(0x1000, False, pid)
     if not alca:
         return False
-    codigo = ctypes.c_ulong()
+    codigo, tempos = ctypes.c_ulong(), [ctypes.c_ulonglong() for _ in range(4)]
     kernel.GetExitCodeProcess(alca, ctypes.byref(codigo))
+    kernel.GetProcessTimes(alca, *(ctypes.byref(t) for t in tempos))
     kernel.CloseHandle(alca)
-    return codigo.value == AINDA_ATIVO
+    # O Windows reaproveita PID: a hora de criacao diz se o processo ainda e o nosso filho.
+    criado = (tempos[0].value - EPOCA_DO_WINDOWS) / 1e7
+    return codigo.value == AINDA_ATIVO and (nascido is None or abs(criado - nascido) < 60)
 
 
 def encerrar(pid):
@@ -105,9 +114,9 @@ def erro(destino):
     return "\n".join(texto.strip().splitlines()[-40:])
 
 
-def situacao(destino, pid):
+def situacao(destino, pid, nascido=None):
     """`rodando`, `ok` (o filho imprimiu o limpador) ou `erro`."""
-    if vivo(pid):
+    if vivo(pid, nascido):
         return "rodando"
     arquivo = log(destino)
     texto = arquivo.read_text(encoding="utf-8", errors="replace") if arquivo.exists() else ""

@@ -82,12 +82,31 @@ def test_filho_que_falha_fica_em_erro_com_o_log(tmp_path, monkeypatch):
     assert "nao_existe.csv" in geracao.erro(destino)
 
 
-def test_reaproveitar_monta_o_ambiente_do_filho(monkeypatch):
-    monkeypatch.setenv("PROVEDOR", "openai")
-    monkeypatch.delenv("PROVEDOR_VIVO", raising=False)
+def test_reaproveitar_usa_como_api_viva_o_provedor_que_a_tela_anuncia(monkeypatch):
+    monkeypatch.setenv("PROVEDOR", "ollama")
+    monkeypatch.setenv("PROVEDOR_VIVO", "openai")
     ambiente = geracao.ambiente(Path("a/respostas.jsonl"))
-    assert (ambiente["PROVEDOR"], ambiente["PROVEDOR_VIVO"]) == ("reaproveitar", "openai")
+    assert (ambiente["PROVEDOR"], ambiente["PROVEDOR_VIVO"]) == ("reaproveitar", "ollama")
     assert ambiente["RESPOSTAS_GRAVADAS"] == str(Path("a/respostas.jsonl"))
-    monkeypatch.setenv("PROVEDOR_VIVO", "ollama")
-    assert geracao.ambiente(Path("x"))["PROVEDOR_VIVO"] == "ollama"
-    assert "RESPOSTAS_GRAVADAS" not in geracao.ambiente(None) or os.environ.get("RESPOSTAS_GRAVADAS")
+    # So com PROVEDOR=gravado (testes e desenvolvimento) o PROVEDOR_VIVO do ambiente vale.
+    monkeypatch.setenv("PROVEDOR", "gravado")
+    assert geracao.ambiente(Path("x"))["PROVEDOR_VIVO"] == "openai"
+    assert geracao.ambiente(None)["PROVEDOR"] == "gravado"
+
+
+def test_vivo_confere_a_hora_de_criacao_contra_pid_reaproveitado():
+    filho = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    agora = time.time()
+    assert geracao.vivo(filho.pid, agora)
+    assert not geracao.vivo(filho.pid, agora - 3600)
+    geracao.encerrar(filho.pid)
+    filho.wait(timeout=30)
+
+
+def test_falha_de_rede_gravada_conta_como_chamada_nova(tmp_path):
+    (tmp_path / "antes").mkdir()
+    (tmp_path / "antes" / "respostas.jsonl").write_text("\n".join([
+        json.dumps({"origem": {}}), json.dumps({"chave": "k0", "bruto": {"rede": True}}),
+        json.dumps({"chave": "k1", "bruto": {"texto": "{}"}})]), encoding="utf-8")
+    grava(tmp_path / "depois", ["detector", "detector"])
+    assert geracao.chamadas(tmp_path / "depois", tmp_path / "antes" / "respostas.jsonl") == (2, 1)

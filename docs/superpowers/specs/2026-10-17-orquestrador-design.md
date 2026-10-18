@@ -109,8 +109,11 @@ credenciais fictícias. O servidor escuta só em `127.0.0.1`.
 
 **Pasta de trabalho local.** O gerador escreve em disco local; o orquestrador monta a
 entrada e recebe a saída em `var/trabalho/<ID_PROCESSO>/<versao>/` e depois envia os
-arquivos ao bucket. O bucket é a fonte de verdade dos artefatos; a pasta de trabalho
-pode ser apagada.
+arquivos ao bucket. O bucket é a fonte de verdade dos artefatos **publicados**; a
+pasta de trabalho é o estado vivo dos processos abertos (o original, o
+`respostas.jsonl` que o aperfeiçoamento reaproveita, os relatórios da tela) e **não
+pode ser apagada enquanto houver processo aberto**. Corrigido em 18/10/2026, achado da
+revisão de código.
 
 ## 4. O banco de controle (SQLite)
 
@@ -544,3 +547,21 @@ Quando o código divergiu da spec, valeu o código, e o motivo está aqui.
   o mesmo guia das respostas gravadas, e o sorteio da interface não o reproduz. O
   percurso offline completo está nos testes (`tests/orquestrador/test_fluxo.py`), e
   foi repetido contra o SeaweedFS real, fora da suíte.
+- **Correções da revisão de código (18/10/2026)**, cada uma com teste e prova por
+  mutação:
+  - "Gerar nova versão" lê `REGRAS` do arquivo do limpador pela AST
+    (`decisoes.regras_do_limpador`), sem executar o arquivo e sem depender de a
+    aplicação ter dado certo.
+  - Esquema nomeado num processo cancelado antes do guia volta a sortear o guia na
+    ingestão seguinte, em vez de quebrar.
+  - Falha do lago ou de arquivo no versionamento fecha a etapa 7 com erro; aprovar só
+    vale na etapa 9 em andamento; cada geração limpa o corrigido e o truncamento da
+    versão anterior do contexto. Antes, aprovar podia gravar o corrigido da v1 como v2.
+  - O PID só é tratado como nosso filho se o processo nasceu até um minuto da hora
+    registrada (o Windows reaproveita PID), e cancelar só encerra durante a geração.
+  - A API viva do aperfeiçoamento é sempre o `PROVEDOR` que a tela anuncia;
+    `PROVEDOR_VIVO` do ambiente só vale com `PROVEDOR=gravado`.
+  - `reaproveitar` pergunta de novo à API o que tinha falhado por rede, e isso conta
+    como chamada nova.
+  - Aperfeiçoar só reprova a versão depois de a nova geração subir.
+  - Cada processamento ganha a sua linha em `DADOS`, mesmo com o hash repetido.

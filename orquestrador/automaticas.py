@@ -6,7 +6,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from orquestrador import (config, controle, decisoes, geracao, lago, relatorio_geracao,
+from botocore.exceptions import BotoCoreError, ClientError
+
+from orquestrador import (amostra, config, controle, decisoes, geracao, lago, relatorio_geracao,
                           relatorio_limpeza)
 from orquestrador.controle import ERRO
 
@@ -28,7 +30,10 @@ def armazenar_original(con, processo):
     ctx = controle.iniciar_etapa(con, processo, 2)
     repetido = controle.dado_existente(con, ctx["dominio"], ctx["esquema"], ctx["hash"])
     if repetido:
-        controle.atualizar_contexto(con, processo, id_dado=repetido["ID_CONTROLE_DADO"],
+        # Uma linha por processamento, apontando para o original ja gravado.
+        id_dado = controle.registrar_dado(con, ctx["hash"], ctx["dominio"], ctx["esquema"],
+                                          repetido["DIRETORIO_ORIGINAL"])
+        controle.atualizar_contexto(con, processo, id_dado=id_dado,
                                     repetido=repetido["DATA_HORA_INGESTAO"])
         return
     prefixo = lago.prefixo(ctx["dominio"], ctx["esquema"], "Original", carimbo())
@@ -46,7 +51,11 @@ def falhar(con, processo, detalhe):
         arquivo = Path(ctx["pasta_versao"]) / "erro.log"
         arquivo.write_text(detalhe, encoding="utf-8")
         pasta = lago.prefixo(ctx["dominio"], ctx["esquema"], "Limpador", ctx["versao_em"])
-        lago.enviar(arquivo, f"{pasta}/erro.log")
+        try:
+            lago.enviar(arquivo, f"{pasta}/erro.log")
+        except (BotoCoreError, ClientError):
+            # Degradacao nomeada: com o lago fora, o erro.log fica so na pasta de trabalho.
+            pass
     return controle.etapa_atual(con, processo)["ID_ETAPA"]
 
 
@@ -82,7 +91,7 @@ def aplicar(con, processo, aprovado=None):
     limpador = Path(ctx["destino"]) / f"limpador_{ctx['versao']}.py"
     try:
         aplicacao = relatorio_limpeza.aplicar(limpador, Path(ctx["trabalho"]) / "original.csv", pasta)
-    except (RuntimeError, subprocess.TimeoutExpired) as erro:
+    except (RuntimeError, subprocess.TimeoutExpired, OSError, ValueError) as erro:
         # Degradacao nomeada: a etapa 8 fica com erro e a saida e gerar nova versao.
         return falhar(con, processo, str(erro))
     resumo = relatorio_limpeza.resumir(aplicacao)
@@ -98,6 +107,12 @@ def guia_do_esquema(con, processo):
     """Etapa 3 do esquema conhecido: a amostra-guia da primeira ingestao, sem novo sorteio."""
     ctx = controle.iniciar_etapa(con, processo, 3)
     area = f"{lago.nome_de_pasta(ctx['dominio'])}/{lago.nome_de_pasta(ctx['esquema'])}/Amostra_Guia"
-    primeira = lago.subpastas(area)[0]
-    controle.atualizar_contexto(con, processo, guia=f"{area}/{primeira}", guia_deste_processo=False)
+    guias = lago.subpastas(area)
+    if not guias:
+        # Esquema nomeado num processo que parou antes do guia: sorteia como esquema novo.
+        n = min(config.LINHAS_GUIA_PADRAO, ctx["n_linhas"])
+        sorteio = amostra.sortear(ctx["n_linhas"], n, config.SEMENTE)
+        controle.atualizar_contexto(con, processo, sorteio=sorteio)
+        return
+    controle.atualizar_contexto(con, processo, guia=f"{area}/{guias[0]}", guia_deste_processo=False)
     controle.marcar(con, processo, ESPERA_PARAMETROS)

@@ -238,3 +238,73 @@ def test_dataset_recusado_na_ingestao(con, conteudo, motivo):
     with pytest.raises(ValueError, match=motivo):
         fluxo.iniciar(con, conteudo, "x.csv", "Outros")
     assert controle.processo_aberto(con) is None
+
+
+# --- Regressoes dos achados da revisao de codigo -----------------------------------------
+
+def test_esquema_nomeado_sem_guia_volta_a_sortear_na_ingestao_seguinte(con, lago_falso):
+    lago.disponivel()
+    # Outro dominio e outro nome: o moto aninhado compartilha o bucket do MVP deste modulo.
+    primeiro = fluxo.iniciar(con, SUJO.read_bytes(), "beers.csv", "Saúde")
+    fluxo.nomear(con, primeiro, "cervejas sem guia")
+    fluxo.cancelar(con, primeiro)
+    segundo = fluxo.iniciar(con, SUJO.read_bytes(), "beers.csv", "Saúde")
+    ctx = controle.contexto(con, segundo)
+    assert controle.etapa_atual(con, segundo)["ID_ETAPA"] == 3
+    assert len(ctx["sorteio"]["linhas"]) == 20 and not ctx.get("guia")
+
+
+def test_lago_que_cai_no_versionamento_deixa_a_etapa_7_em_erro(con, ingerido, monkeypatch):
+    from botocore.exceptions import EndpointConnectionError
+    monkeypatch.setattr(fluxo.geracao, "disparar", lambda *a, **k: type("P", (), {"pid": 999999})())
+    fluxo.gerar(con, ingerido, "inteira", 300)
+    monkeypatch.setattr(fluxo.geracao, "situacao", lambda *a: "ok")
+    def cai(con_, processo_):
+        # Como o versionar real: abre a etapa 7 e o lago cai no envio.
+        controle.iniciar_etapa(con_, processo_, 7)
+        raise EndpointConnectionError(endpoint_url=config.S3_ENDPOINT)
+    monkeypatch.setattr(automaticas, "versionar", cai)
+    assert fluxo.acompanhar(con, ingerido) == 7
+    atual = controle.etapa_atual(con, ingerido)
+    assert atual["STATUS"] == controle.ERRO and "EndpointConnectionError" in atual["DETALHE"]
+    with pytest.raises(ValueError, match="etapa 9"):
+        fluxo.aprovar(con, ingerido)
+
+
+def test_cancelar_nao_mata_processo_alheio_com_o_pid_antigo(con, ingerido, monkeypatch):
+    import subprocess
+    import sys
+    alheio = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    monkeypatch.setattr(fluxo.geracao, "disparar", lambda *a, **k: alheio)
+    fluxo.gerar(con, ingerido, "inteira", 300)
+    # O PID foi "reaproveitado": o processo vivo nasceu uma hora depois do filho original.
+    ctx = controle.contexto(con, ingerido)
+    controle.atualizar_contexto(con, ingerido, geracao={**ctx["geracao"], "inicio": time.time() - 3600})
+    fluxo.cancelar(con, ingerido)
+    assert alheio.poll() is None
+    alheio.kill()
+    alheio.wait(timeout=30)
+
+
+def test_aperfeicoar_que_falha_ao_subir_nao_reprova_a_versao(con, ingerido, monkeypatch):
+    lim = controle.registrar_limpador(con, "Outros", "beers", "x", None)
+    controle.atualizar_contexto(con, ingerido, id_limpador=lim, destino="nao/existe",
+                                geracao={"base": "inteira", "tamanho": 300, "decisoes": []})
+    def falha(*a, **k):
+        raise OSError("lago fora")
+    monkeypatch.setattr(fluxo, "gerar", falha)
+    with pytest.raises(OSError):
+        fluxo.aperfeicoar(con, ingerido, [])
+    assert limpador(con, lim)["STATUS_APROVACAO"] == "pendente"
+
+
+def test_reingestao_do_mesmo_dado_ganha_linha_propria_em_dados(con, lago_falso):
+    lago.disponivel()
+    controle.criar_esquema(con, "Outros", "ab", ["a", "b"], "Outros/ab")
+    um = fluxo.iniciar(con, b"a,b\n1,2\n", "x.csv", "Outros")
+    dois = fluxo.iniciar(con, b"a,b\n1,2\n", "x.csv", "Outros")
+    d1, d2 = (controle.contexto(con, p)["id_dado"] for p in (um, dois))
+    assert d1 != d2
+    linhas = [dict(r) for r in con.execute("SELECT * FROM DADOS ORDER BY ID_CONTROLE_DADO")]
+    assert linhas[0]["DIRETORIO_ORIGINAL"] == linhas[1]["DIRETORIO_ORIGINAL"]
+    assert len(lago.listar("Outros/ab/Original/")) == 1

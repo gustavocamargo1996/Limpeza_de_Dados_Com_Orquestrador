@@ -1,4 +1,6 @@
-"""Sorteia, valida e renumera a amostra-guia e a amostra de geracao."""
+"""Le e valida o dataset enviado, e sorteia, valida e renumera as amostras tiradas dele."""
+import csv
+import io
 import json
 import shutil
 from pathlib import Path
@@ -9,6 +11,22 @@ import pandas as pd
 from orquestrador import config
 
 COLUNAS_PARES = ["linha", "coluna", "sujo", "limpo"]
+
+
+def ler_dataset(conteudo):
+    """O dataset enviado, ou ValueError com o motivo da recusa."""
+    try:
+        cabecalho = next(csv.reader(io.StringIO(conteudo.decode("utf-8-sig"))), [])
+        sujo = pd.read_csv(io.BytesIO(conteudo), **config.LER_CSV)
+    except (UnicodeDecodeError, pd.errors.ParserError, pd.errors.EmptyDataError) as erro:
+        raise ValueError(f"o arquivo nao e um CSV legivel em UTF-8: {erro}") from erro
+    if len(set(cabecalho)) != len(cabecalho):
+        raise ValueError("o dataset tem nomes de coluna repetidos")
+    if any(c.startswith("_") for c in cabecalho):
+        raise ValueError("coluna comecando por _ conflita com a coluna _linha do guia")
+    if sujo.empty:
+        raise ValueError("o dataset nao tem linhas")
+    return sujo
 
 
 def _ordem(sorteio):

@@ -16,13 +16,14 @@
 > a implementação mudou), plano em `docs/superpowers/plans/2026-10-17-orquestrador.md`,
 > como rodar no `CLAUDE.md` §11. Nenhum run com API foi feito: tudo foi provado
 > offline, com respostas gravadas, e o fluxo do MVP foi repetido contra o SeaweedFS
-> real. **O que falta:** o primeiro run pago pela interface, que é decisão do usuário;
-> a revisão dos achados da revisão de código; e o merge.
+> real. Uma revisão de código independente achou oito defeitos reais, todos
+> corrigidos com teste e prova por mutação (lista na seção 16 da spec). **O que
+> falta:** o primeiro run pago pela interface, que é decisão do usuário, e o merge.
 >
 > **O gerador mudou só por inserção** (`docs/DECISOES.md#decisoes-do-usuario` e
 > `#reaproveitar`): um `decisoes.json` opcional na pasta do guia e o modo
 > `PROVEDOR=reaproveitar`. Sem o arquivo, ele é byte a byte o de antes, e o teste de
-> invariante não mudou. Teto: 1.875 linhas (1.850) e `e3_crivo.py` com 211 (200),
+> invariante não mudou. Teto: 1.879 linhas (1.850) e `e3_crivo.py` com 211 (200),
 > estouro aceito e declarado.
 
 Escrito para a próxima sessão, e para mim mesmo depois de a conversa ser

@@ -670,7 +670,7 @@ a 4, porque o catálogo do detector daquela coluna muda. Uma instrução numa re
 aprovada custa a chamada do especificador dela e, se o reparo mudar, a do lote do
 residual que passa a ver outras células.
 
-**Teto.** As inserções levaram `e3_crivo.py` a 211 linhas e o gerador a 1.875,
+**Teto.** As inserções levaram `e3_crivo.py` a 211 linhas e o gerador a 1.879,
 acima do 200 por arquivo e dos 1.850. O usuário decidiu em 17/10/2026 que não
 corromper o código que funciona vale mais que o teto: nada foi refatorado para
 caber, e o estouro está declarado no `CLAUDE.md` §2.

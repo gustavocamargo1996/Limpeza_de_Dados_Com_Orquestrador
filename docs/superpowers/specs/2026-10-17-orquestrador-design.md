@@ -517,7 +517,7 @@ Quando o código divergiu da spec, valeu o código, e o motivo está aqui.
 - **15 arquivos, não 14.** `fluxo.py` saiu com 294 linhas e foi separado pela função:
   `automaticas.py` executa as etapas que o sistema faz sozinho (2, 3 do esquema
   conhecido, 7 e 8, e o registro de erro) e `fluxo.py` guarda as transições que o
-  usuário dispara. O orquestrador fechou em 1.530 linhas (orçamento: 1.400). Declarado
+  usuário dispara. O orquestrador fechou em 1.571 linhas (orçamento: 1.400). Declarado
   no `CLAUDE.md` §2.
 - **Uma sexta tabela, `CONTEXTOS`** (`ID_PROCESSO`, `CONTEXTO` em JSON, `ENCERRADO`):
   é o estado de cada processo que as etapas seguintes leem (caminhos, versão, sorteio,
@@ -539,7 +539,7 @@ Quando o código divergiu da spec, valeu o código, e o motivo está aqui.
   apagar não era necessário.
 - **A origem de cada linha da entrada** (`parametros.json`) usa `fonte: "dados"` para
   as linhas da extração do processo e `fonte: "guia"` para as linhas sujas antigas.
-- **Gerador:** o estouro previsto se confirmou e foi declarado: 1.875 linhas (teto
+- **Gerador:** o estouro previsto se confirmou e foi declarado: 1.879 linhas (teto
   1.850) e `e3_crivo.py` com 211 (teto 200). Rejeitar a regra vencedora de um
   `(coluna, tipo)` deixa a variante seguinte vencer
   (`docs/DECISOES.md#decisoes-do-usuario`).

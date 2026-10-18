@@ -145,14 +145,14 @@ adaptações são inserções, sem refatorar para caber, e um estouro pequeno é
 declarado aqui. O orquestrador tem orçamento próprio: **14 arquivos, 1.400 linhas,
 maior arquivo com 200**, com as mesmas regras de legibilidade.
 
-**O estouro, declarado (17/10/2026):** as inserções levaram o gerador a **1.875
-linhas** (25 acima de 1.850) e `limpeza2/e3_crivo.py` a **211** (11 acima de 200).
+**O estouro, declarado (17/10/2026):** as inserções levaram o gerador a **1.879
+linhas** (29 acima de 1.850) e `limpeza2/e3_crivo.py` a **211** (11 acima de 200).
 O crivo ganhou o motivo `rejeitada_pelo_usuario`, a prioridade da regra aprovada e
-o veto do residual; o provedor ganhou o modo `reaproveitar` e suas duas travas.
+o veto do residual; o provedor ganhou o modo `reaproveitar`, suas duas travas e a nova tentativa do que falhou por rede.
 Nada foi refatorado para caber, por decisão do usuário.
 
 **O orquestrador também passou do orçamento que eu propus (18/10/2026):** fechou
-em **15 arquivos e 1.530 linhas**, contra 14 e 1.400, com o maior em 200
+em **15 arquivos e 1.571 linhas**, contra 14 e 1.400, com o maior em 200
 (`fluxo.py` e `controle.py`). O 15º arquivo veio de separar `automaticas.py`
 (as etapas que o sistema faz sozinho) de `fluxo.py` (as transições), pela
 função: o `fluxo.py` único tinha 294 linhas. As linhas a mais estão nas cinco

@@ -629,3 +629,67 @@ de chegar ao crivo. A fumaça final do limpador continua pegando o que quebra ao
 carregar o módulo. Uma função que lança em **toda** célula marcada não repara nada
 e cai no crivo como `nao_repara`; `lancou` fica para o que lança fora da célula
 (função ausente, coluna inexistente).
+
+---
+
+## As decisões do usuário entram pela pasta do guia {#decisoes-do-usuario}
+
+**Decisão (17/10/2026, para o orquestrador).** Um `decisoes.json` opcional na pasta
+do guia, ao lado de `guia_linhas.csv` e `guia_pares.csv`, é uma lista de
+`{coluna, tipo, parametros, decisao, instrucao, origem, versao}`. `e1_perfil` o lê
+para `Entrada.decisoes`; a assinatura de `gerar_limpador` e a espinha não mudam.
+Sem o arquivo, o gerador é byte a byte o de antes
+(`tests/test_decisoes_gerador.py`, com `[]` e com o invariante).
+
+- **A chave de uma regra** é `(coluna, tipo, parametros)`, por igualdade. É o que
+  liga a decisão à regra entre versões.
+- **`rejeitar`** vira o motivo `rejeitada_pelo_usuario`, o primeiro teste do crivo.
+  No residual, a entrada `{"tipo": "residual", "parametros": {"sujo": X}}` tira `X`
+  do dicionário com o mesmo motivo.
+- **`aprovar`** dispensa os testes estatísticos (`marca_demais`, `ambigua`) e faz a
+  regra vencer a disputa de `superada`. **Não dispensa os testes contra o guia**
+  (`marca_celula_correta`, `marca_valor_certificado`, `perde_par_do_guia` e o crivo
+  do reparo): é o gerador, e não só a interface, que impede o usuário de contradizer
+  o guia que ele mesmo forneceu, e isso vale também para quem usa o gerador sem o
+  orquestrador.
+- **Uma `aprovar` cuja regra o detector não propôs de novo** entra como candidata
+  herdada (`e2_detector.herdadas`) e passa pelo crivo como qualquer outra.
+- **`instrucao`** é acrescentada ao fim do prompt do especificador daquela regra, só
+  quando existe. A instrução de sistema não muda.
+
+**Rejeitar a vencedora deixa a próxima variante vencer.** A decisão vale para uma
+regra, não para o tipo. Rejeitar o `dominio` aprovado de `ounces` no MVP faz a
+variante que tinha ficado `superada` assumir o lugar, e a coluna continua com um
+`dominio` em `REGRAS`. É o comportamento coerente com o crivo; o relatório de
+geração o mostra, e o usuário pode rejeitar a nova vencedora no ciclo seguinte.
+
+**Custo medido sobre o MVP, sem API.** Rejeitar a dependência
+`brewery_id → moda_condicionada` (a que trocou `95` por `12` numa coluna sem erro)
+não muda prompt nenhum: zero chamadas novas. Rejeitar uma conformidade custa de 1
+a 4, porque o catálogo do detector daquela coluna muda. Uma instrução numa regra
+aprovada custa a chamada do especificador dela e, se o reparo mudar, a do lote do
+residual que passa a ver outras células.
+
+**Teto.** As inserções levaram `e3_crivo.py` a 211 linhas e o gerador a 1.875,
+acima do 200 por arquivo e dos 1.850. O usuário decidiu em 17/10/2026 que não
+corromper o código que funciona vale mais que o teto: nada foi refatorado para
+caber, e o estouro está declarado no `CLAUDE.md` §2.
+
+---
+
+## O ciclo reaproveita as respostas gravadas {#reaproveitar}
+
+**Decisão.** `PROVEDOR=reaproveitar` responde do `RESPOSTAS_GRAVADAS` toda chamada
+cujo prompt já foi gravado e chama `PROVEDOR_VIVO` (`openai` ou `ollama`) só para o
+que falta. As respostas novas e as reaproveitadas vão juntas para o
+`respostas.jsonl` da versão nova, que serve de base para o ciclo seguinte.
+
+**Por quê.** Gerações repetidas variam de 5 a 7 pontos de recall. Regenerar tudo ao
+vivo a cada aperfeiçoamento misturaria o efeito da decisão do usuário com a
+variação do LLM, e o usuário não saberia o que a decisão dele fez. Reaproveitando,
+a diferença entre duas versões vem só das decisões, e o ciclo custa poucas
+chamadas.
+
+**Duas travas.** `PROVEDOR_VIVO` desconhecido falha alto, pela mesma razão de
+privacidade do `#provedor`. E `MODELO` diferente do modelo gravado na origem falha
+alto: uma versão com respostas de dois modelos seria inexplicável.

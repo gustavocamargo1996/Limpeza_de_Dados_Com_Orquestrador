@@ -1,11 +1,12 @@
 """As decisoes do usuario no gerador: leitura, crivo, herdadas, instrucao e reaproveitamento."""
+import importlib.util
 import json
 import shutil
 
 import pandas as pd
 import pytest
 
-from limpeza2 import config, e2_detector, e4_especificador, provedor
+from limpeza2 import config, e2_detector, e4_especificador, e5_residual, provedor
 from limpeza2.e1_perfil import perfilar
 from limpeza2.e3_crivo import crivar_deteccao, crivar_residual
 from limpeza2.espinha import gerar_limpador
@@ -228,3 +229,40 @@ def test_reaproveitar_com_modelo_diferente_do_gravado_falha_alto(monkeypatch):
     monkeypatch.setattr(config, "MODELO", "outro-modelo")
     with pytest.raises(ValueError, match="difere do gravado"):
         provedor._construir_api()
+
+
+# --- O ciclo de aperfeicoamento sobre o MVP ------------------------------------------------
+
+MODA_DO_ID = {"coluna": "brewery_id", "tipo": "dependencia",
+              "parametros": {"determinantes": ["brewery-name"]}}
+
+
+def _limpador(caminho):
+    spec = importlib.util.spec_from_file_location("limpador_teste", caminho)
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    return modulo
+
+
+def test_rejeitar_a_moda_do_id_tira_a_regra_sem_chamada_nova(tmp_path, monkeypatch):
+    vivo = _reaproveitar(monkeypatch, RESPOSTAS_MVP)
+    guia = guia_com(tmp_path, [{**MODA_DO_ID, "decisao": "rejeitar"}])
+    caminho = gerar_limpador(SUJO, guia, tmp_path / PASTA_DO_RUN)
+    regras = [(r["coluna"], r["tipo"]) for r in _limpador(caminho).REGRAS]
+    assert ("brewery_id", "dependencia") not in regras and len(regras) == 10
+    raciocinio = (caminho.parent / f"raciocinio_{PASTA_DO_RUN}.md").read_text(encoding="utf-8")
+    assert "### dependencia: rejeitada_pelo_usuario" in raciocinio
+    # Assinatura do comportamento: rejeitar esta regra nao muda prompt nenhum.
+    assert vivo.pedidos == []
+
+
+def test_instrucao_numa_regra_aprovada_reespecifica_so_ela(tmp_path, monkeypatch):
+    vivo = _reaproveitar(monkeypatch, RESPOSTAS_MVP)
+    guia = guia_com(tmp_path, [{**MODA_DO_ID, "decisao": "aprovar", "instrucao": "nao mude o id"}])
+    gerar_limpador(SUJO, guia, tmp_path / PASTA_DO_RUN)
+    # Assinatura: o especificador da regra (prompt novo) e, como a API viva de mentira
+    # corta a resposta, o lote do residual que passa a ver as celulas sem reparo.
+    [(especificador, conteudo), (residual, _)] = vivo.pedidos
+    assert especificador == e4_especificador.INSTRUCAO
+    assert conteudo.endswith("exemplos do guia: nao mude o id")
+    assert residual == e5_residual.INSTRUCAO

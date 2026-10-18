@@ -145,6 +145,12 @@ adaptações são inserções, sem refatorar para caber, e um estouro pequeno é
 declarado aqui. O orquestrador tem orçamento próprio: **14 arquivos, 1.400 linhas,
 maior arquivo com 200**, com as mesmas regras de legibilidade.
 
+**O estouro, declarado (17/10/2026):** as inserções levaram o gerador a **1.875
+linhas** (25 acima de 1.850) e `limpeza2/e3_crivo.py` a **211** (11 acima de 200).
+O crivo ganhou o motivo `rejeitada_pelo_usuario`, a prioridade da regra aprovada e
+o veto do residual; o provedor ganhou o modo `reaproveitar` e suas duas travas.
+Nada foi refatorado para caber, por decisão do usuário.
+
 Meça antes de todo commit que acrescenta código:
 
 ```bash
@@ -352,6 +358,18 @@ código publicado ele lê o `_clean.csv`); arquivos de restrição do benchmark
 (`FunctionalDependency.txt`, `TypeConstraint.txt`, `real_examples.txt`) em
 qualquer fase.
 
+### As decisões do usuário e o reaproveitamento (17/10/2026)
+
+Duas entradas opcionais, acrescentadas para o orquestrador, que deixam o gerador
+idêntico ao de antes quando ausentes:
+
+- **`decisoes.json` na pasta do guia:** `rejeitar` e `aprovar` por regra, com
+  instrução opcional ao especificador. Aprovar nunca dispensa os testes contra o
+  guia. `docs/DECISOES.md#decisoes-do-usuario`.
+- **`PROVEDOR=reaproveitar`** com `RESPOSTAS_GRAVADAS` e `PROVEDOR_VIVO`: responde
+  do gravado e só chama a API para o prompt que mudou.
+  `docs/DECISOES.md#reaproveitar`.
+
 ---
 
 ## 10. Onde não mexer
@@ -359,3 +377,9 @@ qualquer fase.
 **`../POC_Limpeza_de_Dados/`** é a POC 1. É **somente leitura** para esta
 POC: pode ler, citar e copiar código dela, mas nunca editar, commitar ou
 rodar comando que escreva lá.
+
+**`orquestrador/`** é outro componente, com spec própria
+(`docs/superpowers/specs/2026-10-17-orquestrador-design.md`). Ele usa o gerador só
+por subprocesso, chamando `limpeza2.espinha.gerar_limpador`, e nenhum módulo de
+`limpeza2/` pode importar algo de `orquestrador/`. O gerador continua funcionando
+sozinho, pela linha de comando de sempre.

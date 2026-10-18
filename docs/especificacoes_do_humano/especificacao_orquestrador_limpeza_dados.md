@@ -49,7 +49,7 @@ Para isso, deverá solicitar ao usuário uma **amostra-guia**, ou seja, uma pequ
 A interface deverá oferecer duas alternativas para o preenchimento dessa amostra:
 
 1. Disponibilizar um template para download, preenchimento e posterior upload.
-2. Disponibilizar um formulário na própria interface, apresentando as colunas do dataset e uma quantidade mínima de linhas (por exemplo, cinco) para preenchimento pelo usuário.
+2. Disponibilizar um formulário na própria interface, apresentando as colunas do dataset e uma quantidade mínima de linhas (no mínimo dez, sorteadas do próprio dataset e corrigidas pelo usuário) para preenchimento pelo usuário.
 
 **1.2.d. Acompanhamento da geração do limpador**
 

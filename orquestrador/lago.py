@@ -22,11 +22,22 @@ def disponivel():
     """O bucket responde; ele e criado no primeiro uso."""
     s3 = cliente()
     try:
-        if config.S3_BUCKET not in {b["Name"] for b in s3.list_buckets().get("Buckets", [])}:
+        if not _existe(s3):
             s3.create_bucket(Bucket=config.S3_BUCKET)
     except (BotoCoreError, ClientError):
         # Degradacao nomeada: a interface avisa e bloqueia a ingestao.
         return False
+    return True
+
+
+def _existe(s3):
+    """O bucket existe; por head_bucket, porque o SeaweedFS anonimo lista os buckets vazios."""
+    try:
+        s3.head_bucket(Bucket=config.S3_BUCKET)
+    except ClientError as erro:
+        if erro.response["Error"]["Code"] in ("404", "NoSuchBucket"):
+            return False
+        raise
     return True
 
 

@@ -1,5 +1,6 @@
 """O bucket: nomes de pasta, layout da especificacao, hash na metadado e o aviso de fora do ar."""
 import pytest
+from botocore.exceptions import ClientError
 
 from orquestrador import config, lago
 
@@ -48,3 +49,34 @@ def test_bucket_fora_do_ar_e_falso(monkeypatch):
 @pytest.mark.parametrize("texto", ["", "   ", "///"])
 def test_nome_sem_letra_nem_digito_fica_vazio(texto):
     assert lago.nome_de_pasta(texto).strip("_") == ""
+
+
+class SeaweedAnonimo:
+    """Como o SeaweedFS responde a acesso anonimo: lista vazia, mas o bucket existe."""
+
+    def __init__(self, existe):
+        self.existe, self.criados = existe, []
+
+    def list_buckets(self):
+        return {"Buckets": []}
+
+    def head_bucket(self, Bucket):
+        if not self.existe:
+            raise ClientError({"Error": {"Code": "404"}}, "HeadBucket")
+
+    def create_bucket(self, Bucket):
+        if self.existe:
+            raise ClientError({"Error": {"Code": "BucketAlreadyExists"}}, "CreateBucket")
+        self.criados.append(Bucket)
+
+
+def test_bucket_existente_no_seaweedfs_anonimo_esta_disponivel(monkeypatch):
+    falso = SeaweedAnonimo(existe=True)
+    monkeypatch.setattr(lago, "cliente", lambda: falso)
+    assert lago.disponivel() is True and falso.criados == []
+
+
+def test_bucket_inexistente_e_criado(monkeypatch):
+    falso = SeaweedAnonimo(existe=False)
+    monkeypatch.setattr(lago, "cliente", lambda: falso)
+    assert lago.disponivel() is True and falso.criados == [config.S3_BUCKET]

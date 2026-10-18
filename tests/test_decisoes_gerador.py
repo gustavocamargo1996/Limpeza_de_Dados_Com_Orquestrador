@@ -4,12 +4,13 @@ import shutil
 
 import pandas as pd
 
-from limpeza2 import config
+from limpeza2 import config, e2_detector
 from limpeza2.e1_perfil import perfilar
 from limpeza2.e3_crivo import crivar_deteccao, crivar_residual
 from limpeza2.espinha import gerar_limpador
 from limpeza2.tipos import Candidata, Residual
 from tests.apoio import monta_entrada
+from tests.test_e2_detector import entrada_minima, so_na, variante
 from tests.test_invariante import FIXTURES, GUIA, PASTA_DO_RUN, SUJO, sem_cr
 
 
@@ -118,3 +119,35 @@ def test_rejeitar_entrada_do_residual():
                                     justificativas={})], entrada)
     assert r.mapa == {"YY": "TX"}
     assert r.caidas == {"XX": "rejeitada_pelo_usuario"}
+
+
+# --- Candidatas herdadas -------------------------------------------------------------------
+
+def _aprova_dominio(entrada, valores, decisao="aprovar", tipo="dominio"):
+    entrada.decisoes.append({"coluna": "estado", "tipo": tipo, "parametros": {"valores": valores},
+                             "decisao": decisao, "versao": "v1"})
+
+
+def test_regra_aprovada_e_nao_proposta_entra_como_herdada(roteiro):
+    entrada = entrada_minima()
+    _aprova_dominio(entrada, ["MA", "TX"])
+    roteiro(so_na("estado", []))
+    [c] = e2_detector.propor(entrada, [], [])
+    assert (c.coluna, c.tipo, c.parametros) == ("estado", "dominio", {"valores": ["MA", "TX"]})
+    assert c.raciocinio == "aprovada pelo usuario na versao v1"
+
+
+def test_regra_aprovada_e_proposta_de_novo_nao_se_duplica(roteiro):
+    entrada = entrada_minima()
+    _aprova_dominio(entrada, ["MA", "TX"])
+    roteiro(so_na("estado", [variante("dominio", valores=["MA", "TX"])]))
+    [c] = e2_detector.propor(entrada, [], [])
+    assert c.raciocinio == "r"
+
+
+def test_rejeitada_e_residual_nao_viram_candidata(roteiro):
+    entrada = entrada_minima()
+    _aprova_dominio(entrada, ["MA", "TX"], decisao="rejeitar")
+    _aprova_dominio(entrada, ["MA"], tipo="residual")
+    roteiro(so_na("estado", []))
+    assert e2_detector.propor(entrada, [], []) == []

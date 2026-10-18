@@ -40,7 +40,17 @@ def propor(entrada, schema, conformes):
             # Degradacao nomeada: a coluna fica sem regra do LLM; o motivo esta no registro.
             continue
         candidatas += _candidatas(coluna, resposta.get("regras"), tipos)
-    return candidatas
+    return candidatas + herdadas(entrada, conformes + candidatas)
+
+
+def herdadas(entrada, propostas):
+    """As regras aprovadas pelo usuario que nao foram propostas de novo, como candidatas."""
+    ja = [(c.coluna, c.tipo, c.parametros) for c in propostas]
+    return [Candidata(coluna=d["coluna"], tipo=d["tipo"], parametros=d["parametros"],
+                      raciocinio=f"aprovada pelo usuario na versao {d.get('versao') or '?'}")
+            for d in entrada.decisoes
+            if d["decisao"] == "aprovar" and d["tipo"] != "residual"
+            and (d["coluna"], d["tipo"], d["parametros"]) not in ja]
 
 
 def catalogo(entrada, coluna, schema):

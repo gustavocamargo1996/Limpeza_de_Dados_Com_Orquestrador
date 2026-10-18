@@ -113,4 +113,8 @@ def _conteudo(candidata, entrada, mascara):
     ]
     linhas += [f"exemplo do guia: {s!r} -> {c!r}" for s, c in exemplos_do_guia(entrada, coluna)]
     linhas += [f"par minerado: {det} -> {coluna}" for det, alvo in entrada.perfil.pares if alvo == coluna]
+    decisao = entrada.decisao(coluna, candidata.tipo, candidata.parametros)
+    if decisao and decisao.get("instrucao"):
+        linhas.append("instrucao do usuario, valida desde que reproduza os exemplos do guia: "
+                      + decisao["instrucao"])
     return "\n".join(linhas)

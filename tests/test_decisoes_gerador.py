@@ -4,7 +4,7 @@ import shutil
 
 import pandas as pd
 
-from limpeza2 import config, e2_detector
+from limpeza2 import config, e2_detector, e4_especificador
 from limpeza2.e1_perfil import perfilar
 from limpeza2.e3_crivo import crivar_deteccao, crivar_residual
 from limpeza2.espinha import gerar_limpador
@@ -151,3 +151,28 @@ def test_rejeitada_e_residual_nao_viram_candidata(roteiro):
     _aprova_dominio(entrada, ["MA"], tipo="residual")
     roteiro(so_na("estado", []))
     assert e2_detector.propor(entrada, [], []) == []
+
+
+# --- Instrucao do usuario no especificador -------------------------------------------------
+
+def _conteudo_com(decisoes):
+    entrada = monta_entrada(_sujo_dez())
+    entrada.decisoes = decisoes
+    c = _cand("dominio", {"valores": ["MA", "TX"]})
+    mascara = pd.Series([v not in ("MA", "TX") for v in entrada.sujo["estado"]])
+    return e4_especificador._conteudo(c, entrada, mascara)
+
+
+def test_instrucao_do_usuario_entra_no_prompt_do_especificador():
+    d = {"coluna": "estado", "tipo": "dominio", "parametros": {"valores": ["MA", "TX"]},
+         "decisao": "aprovar", "instrucao": "use a sigla do estado vizinho"}
+    assert _conteudo_com([d]).splitlines()[-1] == (
+        "instrucao do usuario, valida desde que reproduza os exemplos do guia: "
+        "use a sigla do estado vizinho")
+
+
+def test_sem_instrucao_o_prompt_do_especificador_nao_muda():
+    d = {"coluna": "estado", "tipo": "dominio", "parametros": {"valores": ["MA", "TX"]},
+         "decisao": "aprovar", "instrucao": None}
+    assert _conteudo_com([d]) == _conteudo_com([])
+    assert "instrucao do usuario" not in _conteudo_com([])

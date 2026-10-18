@@ -135,11 +135,22 @@ fracionados. Então valem duas regras, e a segunda manda mais que o número:
 
 A folga de arquivos existe para esse caso, não para acomodar desenho novo.
 
+**O teto vale só para o gerador, desde 17/10/2026.** Com o orquestrador no mesmo
+repositório (`docs/superpowers/specs/2026-10-17-orquestrador-design.md`), o usuário
+decidiu que a medida conta só `limpeza2/`, `preparar_guia.py` e `medir.py`, e elevou
+o teto de linhas do gerador para **1.850**, para caber as adaptações que o
+orquestrador exige (decisões do usuário e reaproveitamento de respostas). Ele
+decidiu também que **não corromper o código que funciona vale mais que o teto**: as
+adaptações são inserções, sem refatorar para caber, e um estouro pequeno é aceito e
+declarado aqui. O orquestrador tem orçamento próprio: **14 arquivos, 1.400 linhas,
+maior arquivo com 200**, com as mesmas regras de legibilidade.
+
 Meça antes de todo commit que acrescenta código:
 
 ```bash
-git ls-files "*.py" ":!tests/" | wc -l
-git ls-files "*.py" ":!tests/" | xargs wc -l | tail -1
+git ls-files "limpeza2/*.py" preparar_guia.py medir.py | wc -l
+git ls-files "limpeza2/*.py" preparar_guia.py medir.py | xargs wc -l | tail -1
+git ls-files "orquestrador/*.py" | xargs wc -l | tail -1
 ```
 
 Estourar o teto é defeito, não detalhe. A saída é simplificar o desenho, não

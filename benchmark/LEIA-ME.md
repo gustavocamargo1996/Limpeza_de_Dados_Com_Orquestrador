@@ -37,7 +37,8 @@ os pares. Reporte essa supervisão junto de qualquer número.
 ## Como testar
 
 Pré-requisito: o ambiente preparado conforme o `README.md` da raiz (seção 1). Os
-comandos rodam da raiz do repositório.
+comandos rodam da raiz do repositório. Cada passo traz o comando do Windows
+(PowerShell) e o do Linux ou macOS.
 
 ### 1. Sem gastar API: reproduzir o run gravado do `beers`
 
@@ -45,6 +46,13 @@ comandos rodam da raiz do repositório.
 $env:PROVEDOR = "gravado"
 $env:RESPOSTAS_GRAVADAS = "tests/fixtures/respostas_beers_poc2.jsonl"
 .venv\Scripts\python -m limpeza2.espinha --sujo benchmark/beers/sujo.csv --guia benchmark/beers/guia --nome beers
+```
+
+```bash
+export PROVEDOR=gravado
+export RESPOSTAS_GRAVADAS=tests/fixtures/respostas_beers_poc2.jsonl
+.venv/bin/python -m limpeza2.espinha --sujo benchmark/beers/sujo.csv --guia benchmark/beers/guia --nome beers
+unset PROVEDOR RESPOSTAS_GRAVADAS   # antes do passo 2, para valer o .env
 ```
 
 Isso refaz, a partir das respostas gravadas do LLM, o limpador do run de 12/10/2026. Só
@@ -60,6 +68,10 @@ Com `PROVEDOR=openai` e a sua chave no `.env` (cerca de 30 chamadas, centavos de
 .venv\Scripts\python -m limpeza2.espinha --sujo benchmark/hospital/sujo.csv --guia benchmark/hospital/guia --nome hospital
 ```
 
+```bash
+.venv/bin/python -m limpeza2.espinha --sujo benchmark/hospital/sujo.csv --guia benchmark/hospital/guia --nome hospital
+```
+
 Troque `hospital` por qualquer um dos cinco. A saída vai para
 `saida/<nome>_<data_hora>/`: o limpador, o raciocínio de cada regra e as respostas
 gravadas. Guarde o `respostas.jsonl` de cada run: com ele, o run pode ser refeito sem API.
@@ -70,6 +82,10 @@ Para medir o efeito do guia, gere também **sem** ele (tire o `--guia`).
 
 ```powershell
 .venv\Scripts\python medir.py --limpador saida\<pasta>\limpador_<...>.py --sujo benchmark/hospital/sujo.csv --limpo benchmark/hospital/limpo.csv --guia benchmark/hospital/guia
+```
+
+```bash
+.venv/bin/python medir.py --limpador saida/<pasta>/limpador_<...>.py --sujo benchmark/hospital/sujo.csv --limpo benchmark/hospital/limpo.csv --guia benchmark/hospital/guia
 ```
 
 Passe o `--guia` também na medição, mesmo para o limpador gerado sem guia: ele tira da

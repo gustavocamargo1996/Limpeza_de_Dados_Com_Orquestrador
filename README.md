@@ -19,8 +19,10 @@ O gerador roda sozinho, pela linha de comando. O orquestrador o chama em subproc
 
 ### Requisitos
 
-- **Windows.** É o único sistema testado. No Linux deve funcionar. **No macOS, o painel
-  do orquestrador não acompanha a geração** (a verificação de processo vivo usa `/proc`).
+- **Windows ou Linux.** Os comandos deste README são do Windows (PowerShell); os do
+  Linux estão na seção 1.1. **No macOS, o painel do orquestrador não acompanha a
+  geração** (a verificação de processo vivo usa `/proc`); o resto segue os comandos do
+  Linux.
 - **Git.**
 - **[uv](https://docs.astral.sh/uv/)**, que gerencia o Python e o ambiente virtual.
 - **Python 3.14**, a única versão testada. O `uv` o baixa se faltar.
@@ -71,6 +73,64 @@ um erro de digitação não mandar dados para fora da rede.
 **Custo e privacidade:** com `PROVEDOR=openai`, cada geração faz cerca de 30 chamadas
 (no máximo 80) e **manda linhas da tabela para a OpenAI**. Use dados que você pode
 enviar, ou o Ollama.
+
+### 1.1 No Linux (e no macOS)
+
+Duas diferenças em relação ao Windows:
+
+- o Python do ambiente fica em **`.venv/bin/python`**, não em `.venv\Scripts\python`
+  (no Linux não existe a pasta `Scripts`);
+- variável de ambiente se define com **`export NOME=valor`**, não com
+  `$env:NOME = "valor"`, e os caminhos usam `/`.
+
+Os mesmos comandos das seções seguintes, na ordem em que aparecem:
+
+```bash
+# Instalação (uv: https://docs.astral.sh/uv/getting-started/installation/)
+git clone https://github.com/gustavocamargo1996/Limpeza_de_Dados_Com_Orquestrador.git
+cd Limpeza_de_Dados_Com_Orquestrador
+uv venv --python 3.14
+uv pip install -r requirements.txt
+
+# Conferir a instalação (sem gastar API)
+.venv/bin/python -m pytest
+
+# Configurar o provedor de LLM (depois edite o .env)
+cp .env.exemplo .env
+
+# Gerar um limpador (seção 2)
+.venv/bin/python -m limpeza2.espinha --sujo <arquivo.csv> --guia <pasta_do_guia> --nome <nome>
+
+# Exemplo sem gastar API, reproduzindo o run gravado do beers
+export PROVEDOR=gravado
+export RESPOSTAS_GRAVADAS=tests/fixtures/respostas_beers_poc2.jsonl
+.venv/bin/python -m limpeza2.espinha --sujo tests/fixtures/beers_dirty_300.csv --guia dados/guia/beers --nome beers
+unset PROVEDOR RESPOSTAS_GRAVADAS   # volta a valer o que está no .env
+
+# Usar o limpador gerado
+.venv/bin/python saida/<pasta>/limpador_<...>.py entrada.csv saida.csv --flags flags.csv
+
+# Medir contra o gabarito
+.venv/bin/python medir.py --limpador saida/<pasta>/limpador_<...>.py --sujo tests/fixtures/beers_dirty_300.csv --limpo tests/fixtures/beers_clean_300.csv --guia dados/guia/beers
+
+# Sortear um guia de benchmark
+.venv/bin/python preparar_guia.py --dataset <nome> --sujo <sujo.csv> --limpo <limpo.csv> --linhas 20 --pares 2
+```
+
+O `export` vale só para o terminal aberto. Para o orquestrador (seção 3), o
+`subir_seaweed.cmd` é só do Windows. No Linux, baixe o `weed` para Linux na mesma
+página de releases e, da raiz do repositório, num terminal que fica aberto:
+
+```bash
+mkdir -p var/seaweed
+weed server -dir=var/seaweed -ip=127.0.0.1 -s3 -s3.port=8333 -volume.port=9340
+```
+
+E noutro terminal:
+
+```bash
+.venv/bin/streamlit run orquestrador/app.py
+```
 
 ---
 

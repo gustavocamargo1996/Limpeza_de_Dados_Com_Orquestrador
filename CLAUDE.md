@@ -421,8 +421,12 @@ subir_seaweed.cmd       # sobe o SeaweedFS local (.cmd: roda no PowerShell e no 
 
 ```powershell
 .\subir_seaweed.cmd                            # num terminal; S3 em 127.0.0.1:8333
-.venv\Scripts\streamlit run orquestradorpp.py  # noutro terminal
+.venv\Scripts\streamlit run orquestrador\app.py  # noutro terminal
 ```
+
+O `subir_seaweed.cmd` acha o `weed.exe` pela variável `WEED` ou pelo PATH e guarda os
+dados em `SEAWEED_DADOS` ou, sem ela, em `var\seaweed`. A instalação para outra pessoa
+está no `README.md`.
 
 O SeaweedFS sobe com `-master.raftHashicorp`: com o raft padrão ele entra em `panic`
 no Windows ao reabrir o próprio estado (`failed to sync state dir ... Access is

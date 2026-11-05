@@ -10,6 +10,22 @@
 > **Se a sua tarefa é o orquestrador** descrito em
 > `docs/especificacoes_do_humano/`, comece por `docs/HANDOFF_ORQUESTRADOR.md`.
 
+> **Estado em 18/10/2026: o orquestrador está implementado na branch
+> `orquestrador`, sem merge em `main`.** Spec em
+> `docs/superpowers/specs/2026-10-17-orquestrador-design.md` (a seção 16 lista o que
+> a implementação mudou), plano em `docs/superpowers/plans/2026-10-17-orquestrador.md`,
+> como rodar no `CLAUDE.md` §11. Nenhum run com API foi feito: tudo foi provado
+> offline, com respostas gravadas, e o fluxo do MVP foi repetido contra o SeaweedFS
+> real. Uma revisão de código independente achou oito defeitos reais, todos
+> corrigidos com teste e prova por mutação (lista na seção 16 da spec). **O que
+> falta:** o primeiro run pago pela interface, que é decisão do usuário, e o merge.
+>
+> **O gerador mudou só por inserção** (`docs/DECISOES.md#decisoes-do-usuario` e
+> `#reaproveitar`): um `decisoes.json` opcional na pasta do guia e o modo
+> `PROVEDOR=reaproveitar`. Sem o arquivo, ele é byte a byte o de antes, e o teste de
+> invariante não mudou. Teto: 1.879 linhas (1.850) e `e3_crivo.py` com 211 (200),
+> estouro aceito e declarado.
+
 Escrito para a próxima sessão, e para mim mesmo depois de a conversa ser
 resumida. Leia junto com o `CLAUDE.md` e o `docs/DECISOES.md`.
 

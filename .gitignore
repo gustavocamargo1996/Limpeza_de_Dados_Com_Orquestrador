@@ -8,3 +8,4 @@ raciocinio_*.md
 .superpowers/
 .pytest_cache/
 saida/
+var/

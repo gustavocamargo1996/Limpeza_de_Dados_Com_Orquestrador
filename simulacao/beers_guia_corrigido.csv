@@ -1,0 +1,21 @@
+_linha,index,id,beer-name,style,ounces,abv,ibu,brewery_id,brewery-name,city,state
+164,165,108,White Rascal,Witbier,12,0.056,10,37,Avery Brewing Company,Boulder,CO
+139,140,429,Ninja Porter,American Porter,12,0.053,26,528,Asheville Brewing Company,Asheville,NC
+105,106,1520,Barney Flats Oatmeal Stout,Oatmeal Stout,12,0.057,13,171,Anderson Valley Brewing Company,Boonville,CA
+6,7,2260,Lake Street Express,American Pale Ale (APA),12,0.045,,177,18th Street Brewery,Gary,IN
+181,182,965,Field 41 Pale Ale,American Pale Ale (APA),12,0.044,38,483,Bale Breaker Brewing Company,Yakima,WA
+200,201,1965,Sky-Five,American IPA,12,0.067,70,258,Bauhaus Brew Labs,Minneapolis,MN
+234,235,1158,La Frontera Premium IPA,American IPA,12,0.078,,463,Big Bend Brewing Company,Alpine,TX
+197,198,2188,Lost Meridian Wit,Witbier,12,0.05,20,116,Base Camp Brewing Co.,Portland,OR
+115,116,367,Hop Ottin' IPA (2011),American IPA,12,0.07,80,171,Anderson Valley Brewing Company,Boonville,CA
+207,208,910,Hayride Autumn Ale,Rye Beer,12,0.066,,292,Baxter Brewing Company,Lewiston,ME
+182,183,2593,Grapefruit Sculpin,American IPA,12,0.07,,34,Ballast Point Brewing Company,San Diego,CA
+28,29,799,21st Amendment IPA (2006),American IPA,12,0.07,70,368,21st Amendment Brewery,San Francisco,CA
+136,137,1172,Mo's Gose,Gose,16,0.052,10,461,Armstrong Brewing Company,South San Francisco,CA
+170,171,705,Hog Wild India Pale Ale,American IPA,12,0.067,,360,Aviator Brewing Company,Fuquay-Varina,NC
+215,216,2420,Back Bay IPA,American IPA,12,0.068,85,103,Beer Works Brewery,Lowell,MA
+3,4,2263,Sinister,American Double / Imperial IPA,12,0.09,,177,18th Street Brewery,Gary,IN
+247,248,2469,Ryecoe,American IPA,16,0.062,,8,Big Lake Brewing,Holland,MI
+58,59,866,British Pale Ale (2010),English Pale Ale,16,0.054,30,481,7 Seas Brewing Company,Gig Harbor,WA
+89,90,1920,Alaskan Amber,Altbier,12,0.053,18,270,Alaskan Brewing Company,Juneau,AK
+222,223,1955,Best Brown,American Brown Ale,16,0.058,,76,Bell's Brewery,Kalamazoo,MI

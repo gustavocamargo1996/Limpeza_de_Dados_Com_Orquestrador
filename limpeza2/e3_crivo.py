@@ -11,7 +11,7 @@ from limpeza2.motor import detectar, reparar
 MOTIVOS = (
     "aprovada", "marca_celula_correta", "vacua", "marca_demais", "perde_par_do_guia",
     "ambigua", "sem_perfil", "lancou", "nao_repara", "corrompe_celula_do_guia",
-    "marca_valor_certificado", "superada",
+    "marca_valor_certificado", "superada", "rejeitada_pelo_usuario",
 )
 TIPOS_DE_VALOR = ("formato", "dominio", "faixa", "ausente_disfarcado", "conformidade")
 
@@ -25,7 +25,7 @@ def crivar_deteccao(candidatas, entrada):
             continue
         chave = (candidata.coluna, candidata.tipo)
         anterior = vencedoras.get(chave)
-        if anterior is None or candidata.metricas["taxa"] < anterior[0].metricas["taxa"]:
+        if anterior is None or _prioridade(candidata) < _prioridade(anterior[0]):
             vencedoras[chave] = (candidata, mascara)
     for coluna in {c for c, _ in vencedoras}:
         _gravar_uniao([v for (c, _), v in vencedoras.items() if c == coluna])
@@ -34,6 +34,11 @@ def crivar_deteccao(candidatas, entrada):
         if c.metricas.get("motivo") == "aprovada" and id(c) not in finais:
             c.metricas["motivo"] = "superada"
     return [c for c in candidatas if id(c) in finais]
+
+
+def _prioridade(candidata):
+    """A aprovada pelo usuario vence a disputa; entre iguais, vence a de menor taxa."""
+    return (candidata.metricas.get("decisao") != "aprovar", candidata.metricas["taxa"])
 
 
 def _gravar_uniao(vencedoras):
@@ -62,6 +67,9 @@ def _mascara(candidata, entrada):
         "marcadas": marcadas, "taxa": marcadas / len(sujo), "motivo": "aprovada",
         "teto": teto_da_coluna(entrada, candidata.coluna),
     }
+    decisao = entrada.decisao(candidata.coluna, candidata.tipo, candidata.parametros)
+    if decisao:
+        candidata.metricas["decisao"] = decisao["decisao"]
     motivo = _reprovar(candidata, entrada, mascara)
     if motivo:
         candidata.metricas["motivo"] = motivo
@@ -71,6 +79,9 @@ def _mascara(candidata, entrada):
 
 def _reprovar(candidata, entrada, mascara):
     """O primeiro dos cinco testes que a candidata falha, ou None se passar em todos."""
+    if candidata.metricas.get("decisao") == "rejeitar":
+        return "rejeitada_pelo_usuario"
+    aprovada = candidata.metricas.get("decisao") == "aprovar"
     if candidata.tipo == "dependencia":
         determinantes = candidata.parametros["determinantes"]
         # Sem entrada no perfil nao ha como medir a ambiguidade, e deixar
@@ -80,7 +91,7 @@ def _reprovar(candidata, entrada, mascara):
         par = entrada.perfil.pares.get((determinantes[0], candidata.coluna))
         if par is None:
             return "sem_perfil"
-        if par["frac_ambiguos"] > config.TETO_AMBIGUIDADE:
+        if par["frac_ambiguos"] > config.TETO_AMBIGUIDADE and not aprovada:
             return "ambigua"
     if _celulas_certas(entrada, candidata.coluna, mascara):
         return "marca_celula_correta"
@@ -91,7 +102,8 @@ def _reprovar(candidata, entrada, mascara):
     if candidata.metricas["marcadas"] == 0:
         return "vacua"
     # Conformidade vem de dado certificado: a taxa alta e a verdade da coluna, sem teto.
-    if candidata.tipo != "conformidade" and candidata.metricas["taxa"] > candidata.metricas["teto"]:
+    if (candidata.tipo != "conformidade" and not aprovada
+            and candidata.metricas["taxa"] > candidata.metricas["teto"]):
         return "marca_demais"
     pares = entrada.guia_pares
     if not pares.empty:
@@ -190,6 +202,9 @@ def crivar_residual(residuais, entrada):
             elif sujo in certificados:
                 # Ver docs/DECISOES.md#residual-congelado: no dicionario o veto nao tem excecao.
                 residual.caidas[sujo] = "valor_certificado"
+            elif (entrada.decisao(residual.coluna, "residual", {"sujo": sujo}) or {}).get(
+                    "decisao") == "rejeitar":
+                residual.caidas[sujo] = "rejeitada_pelo_usuario"
             else:
                 continue
             del residual.mapa[sujo]

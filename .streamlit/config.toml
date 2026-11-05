@@ -1,0 +1,6 @@
+# O app mexe com dados do usuario: escuta so nesta maquina e nao manda estatistica de uso.
+[server]
+address = "127.0.0.1"
+
+[browser]
+gatherUsageStats = false

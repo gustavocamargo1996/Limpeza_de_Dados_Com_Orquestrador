@@ -23,6 +23,13 @@ class Entrada:
     guia_linhas: pd.DataFrame
     guia_pares: pd.DataFrame
     perfil: Perfil
+    decisoes: list = field(default_factory=list)
+
+    def decisao(self, coluna, tipo, parametros):
+        """A decisao do usuario sobre a regra (coluna, tipo, parametros), ou None."""
+        chave = (coluna, tipo, parametros)
+        return next((d for d in self.decisoes
+                     if (d["coluna"], d["tipo"], d["parametros"]) == chave), None)
 
 
 @dataclass

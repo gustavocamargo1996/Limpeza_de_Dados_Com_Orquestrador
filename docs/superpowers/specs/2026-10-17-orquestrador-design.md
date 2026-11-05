@@ -42,7 +42,7 @@ orquestrador/
   relatorio_limpeza.py executa o limpador em subprocesso e resume o que ele mudou
   decisoes.py          monta o decisoes.json e recusa o que contradiz o guia
   config.py            endpoint, bucket, caminho do SQLite, tamanhos padrao
-subir_seaweed.sh       sobe o SeaweedFS com os argumentos certos (nao e Python)
+subir_seaweed.cmd      sobe o SeaweedFS com os argumentos certos (nao e Python)
 var/                   SQLite e pastas de trabalho; ignorada pelo git
 ```
 
@@ -109,8 +109,11 @@ credenciais fictícias. O servidor escuta só em `127.0.0.1`.
 
 **Pasta de trabalho local.** O gerador escreve em disco local; o orquestrador monta a
 entrada e recebe a saída em `var/trabalho/<ID_PROCESSO>/<versao>/` e depois envia os
-arquivos ao bucket. O bucket é a fonte de verdade dos artefatos; a pasta de trabalho
-pode ser apagada.
+arquivos ao bucket. O bucket é a fonte de verdade dos artefatos **publicados**; a
+pasta de trabalho é o estado vivo dos processos abertos (o original, o
+`respostas.jsonl` que o aperfeiçoamento reaproveita, os relatórios da tela) e **não
+pode ser apagada enquanto houver processo aberto**. Corrigido em 18/10/2026, achado da
+revisão de código.
 
 ## 4. O banco de controle (SQLite)
 
@@ -430,8 +433,8 @@ em `C:\Users\gusta\tools\seaweedfs\sonda_orquestrador\`:
 - O PowerShell quebra `-ip=127.0.0.1`; por isso o script de partida é Bash e o
   orquestrador nunca passa argumentos por shell.
 
-`subir_seaweed.sh` roda
-`weed.exe server -dir=<SEAWEED_DADOS> -ip=127.0.0.1 -s3 -s3.port=8333`, com
+`subir_seaweed.cmd` roda
+`weed.exe server -dir=<SEAWEED_DADOS> -ip=127.0.0.1 -s3 -s3.port=8333 -volume.port=9340 -master.raftHashicorp`, com
 `SEAWEED_DADOS` padrão `C:\Users\gusta\tools\seaweedfs\dados_orquestrador`. O bucket é
 criado por `lago.py` no primeiro uso.
 
@@ -452,7 +455,7 @@ testes.
 | Filho do gerador sai com erro | etapa `concluido com erro`; o fim do stderr vai a `erro.log` no bucket e ao painel; botão "tentar de novo" |
 | Geração passa de `TIMEOUT_GERACAO` | o filho é encerrado; etapa com erro, motivo "timeout" |
 | App reabre com etapa `em andamento` cujo `PID` não existe | etapa vira `concluido com erro`, motivo "interrompido"; "tentar de novo" |
-| SeaweedFS fora do ar | verificado na abertura; aviso "bucket indisponível: rode `subir_seaweed.sh`"; ingestão bloqueada; **sem gravação local de reserva** |
+| SeaweedFS fora do ar | verificado na abertura; aviso "bucket indisponível: rode `subir_seaweed.cmd`"; ingestão bloqueada; **sem gravação local de reserva** |
 | Dataset vazio, com coluna repetida ou com coluna começando por `_` | recusado no upload, com o motivo |
 | Extração com sha256 já ingerido no mesmo esquema | aviso com a data da ingestão anterior; o processo pode seguir, sem gravar o original de novo |
 | Template do guia com colunas ou `_linha` divergentes | recusado, com a lista do que diverge |
@@ -506,3 +509,71 @@ por mutação (`CLAUDE.md` §8).
 - **Run pago.** Toda geração real é anunciada na tela (seção 6.3). Durante o
   desenvolvimento, nenhum run real é disparado sem anúncio ao usuário e aprovação
   (`CLAUDE.md` §8).
+
+## 16. O que a implementação mudou neste desenho (18/10/2026)
+
+Quando o código divergiu da spec, valeu o código, e o motivo está aqui.
+
+- **15 arquivos, não 14.** `fluxo.py` saiu com 294 linhas e foi separado pela função:
+  `automaticas.py` executa as etapas que o sistema faz sozinho (2, 3 do esquema
+  conhecido, 7 e 8, e o registro de erro) e `fluxo.py` guarda as transições que o
+  usuário dispara. O orquestrador fechou em 1.571 linhas (orçamento: 1.400). Declarado
+  no `CLAUDE.md` §2.
+- **Uma sexta tabela, `CONTEXTOS`** (`ID_PROCESSO`, `CONTEXTO` em JSON, `ENCERRADO`):
+  é o estado de cada processo que as etapas seguintes leem (caminhos, versão, sorteio,
+  parâmetros). `PROCESSOS` continua com uma linha por etapa; `ID_PROCESSO` vem de
+  `CONTEXTOS`.
+- **Etapa pulada é registrada.** Se a geração passa de uma etapa a outra entre duas
+  consultas do painel, a intermediária ganha a linha dela em `PROCESSOS`, com duração
+  quase zero, em vez de sumir do histórico.
+- **O residual roda depois do codificador** na espinha; por isso a última chamada
+  gravada é do residual e a etapa observada pode voltar de 6 para 5. O fluxo só anda
+  para a frente.
+- **`lago.disponivel` usa `head_bucket`.** Com acesso anônimo, o SeaweedFS responde a
+  `list_buckets` com lista vazia; a primeira versão dizia "bucket indisponível" na
+  segunda abertura do app. Achado no teste de integração com o SeaweedFS real.
+- **`.streamlit/config.toml`** faz o app escutar só em `127.0.0.1` e desliga a
+  estatística de uso: o padrão do Streamlit escutava na rede local e anunciava URL
+  externa.
+- **`cancelar` não apaga a pasta de trabalho.** Tudo o que importa está no lago;
+  apagar não era necessário.
+- **A origem de cada linha da entrada** (`parametros.json`) usa `fonte: "dados"` para
+  as linhas da extração do processo e `fonte: "guia"` para as linhas sujas antigas.
+- **Gerador:** o estouro previsto se confirmou e foi declarado: 1.879 linhas (teto
+  1.850) e `e3_crivo.py` com 211 (teto 200). Rejeitar a regra vencedora de um
+  `(coluna, tipo)` deixa a variante seguinte vencer
+  (`docs/DECISOES.md#decisoes-do-usuario`).
+- **Percurso offline pela interface:** com `PROVEDOR=gravado` a geração só funciona com
+  o mesmo guia das respostas gravadas, e o sorteio da interface não o reproduz. O
+  percurso offline completo está nos testes (`tests/orquestrador/test_fluxo.py`), e
+  foi repetido contra o SeaweedFS real, fora da suíte.
+- **Correções da revisão de código (18/10/2026)**, cada uma com teste e prova por
+  mutação:
+  - "Gerar nova versão" lê `REGRAS` do arquivo do limpador pela AST
+    (`decisoes.regras_do_limpador`), sem executar o arquivo e sem depender de a
+    aplicação ter dado certo.
+  - Esquema nomeado num processo cancelado antes do guia volta a sortear o guia na
+    ingestão seguinte, em vez de quebrar.
+  - Falha do lago ou de arquivo no versionamento fecha a etapa 7 com erro; aprovar só
+    vale na etapa 9 em andamento; cada geração limpa o corrigido e o truncamento da
+    versão anterior do contexto. Antes, aprovar podia gravar o corrigido da v1 como v2.
+  - O PID só é tratado como nosso filho se o processo nasceu até um minuto da hora
+    registrada (o Windows reaproveita PID), e cancelar só encerra durante a geração.
+  - A API viva do aperfeiçoamento é sempre o `PROVEDOR` que a tela anuncia;
+    `PROVEDOR_VIVO` do ambiente só vale com `PROVEDOR=gravado`.
+  - `reaproveitar` pergunta de novo à API o que tinha falhado por rede, e isso conta
+    como chamada nova.
+  - Aperfeiçoar só reprova a versão depois de a nova geração subir.
+  - Cada processamento ganha a sua linha em `DADOS`, mesmo com o hash repetido.
+- **`subir_seaweed.cmd` no lugar de `subir_seaweed.sh` (18/10/2026),** achado pelo
+  usuário ao rodar: no PowerShell, `bash` é o Bash do WSL, que não entende caminhos
+  `/c/...` e falha com `mkdir: Permission denied`. O `.cmd` não quebra `-ip=127.0.0.1` e
+  roda no PowerShell e no `cmd`. Ao testá-lo, a segunda partida reproduziu o `panic` do
+  raft de 29/04 (`failed to sync state dir ... Access is denied`), que a sonda não pegou
+  porque só subiu pastas novas; `-master.raftHashicorp` o resolve, verificado com duas
+  partidas seguidas e com um objeto que sobreviveu à reinicialização.
+- **Volume na porta 9340 (18/10/2026).** A 8080 padrão estava com o Docker (o Airflow de
+  outro projeto). As interfaces web: Filer em `http://127.0.0.1:8888/buckets/limpeza/`,
+  master em `:9333`, volumes em `:9340/ui/index.html`. Com o disco 94,6% cheio, o
+  SeaweedFS limita o servidor a 8 volumes, e cada bucket ocupa 7: cabe só o `limpeza`,
+  o que reforça a regra de um bucket só.

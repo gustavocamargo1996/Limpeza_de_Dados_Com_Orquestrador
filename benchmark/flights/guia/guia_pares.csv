@@ -1,0 +1,9 @@
+linha,coluna,sujo,limpo
+59,sched_dep_time,,10:39 a.m.
+224,sched_dep_time,,8:20 p.m.
+137,act_dep_time,8:55 a.m.,8:56 a.m.
+151,act_dep_time,7:42 p.m.,7:14 p.m.
+90,sched_arr_time,,5:15 p.m.
+109,sched_arr_time,,4:31 p.m.
+62,act_arr_time,,5:26 a.m.
+264,act_arr_time,,1:19 p.m.

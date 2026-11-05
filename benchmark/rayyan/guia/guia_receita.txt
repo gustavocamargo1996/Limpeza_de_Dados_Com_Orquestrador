@@ -1,0 +1,4 @@
+dataset=rayyan
+semente=20261011
+linhas=20
+pares_por_coluna=2

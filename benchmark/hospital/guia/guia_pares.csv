@@ -1,0 +1,35 @@
+linha,coluna,sujo,limpo
+45,ProviderNumber,x0005,10005
+213,ProviderNumber,x00xx,10011
+131,HospitalName,crenshaw cxmmunity hxspital,crenshaw community hospital
+171,HospitalName,marshall medical cenxer norxh,marshall medical center north
+94,Address1,702xnxmainxst,702 n main st
+260,Address1,33700 hxghway 43,33700 highway 43
+10,City,sheffxeld,sheffield
+93,City,flxrence,florence
+50,State,xl,al
+140,State,ax,al
+196,ZipCode,3x23x,35235
+290,ZipCode,x5007,35007
+223,CountyName,xe kalb,de kalb
+252,CountyName,xlarke,clarke
+217,PhoneNumber,2058x8x122,2058383122
+261,PhoneNumber,334x3xx221,3346366221
+39,HospitalType,acxte care hospitals,acute care hospitals
+280,HospitalType,acutexcarexhospitals,acute care hospitals
+164,HospitalOwner,pxopxietaxy,proprietary
+247,HospitalOwner,governxent - federal,government - federal
+43,EmergencyService,yex,yes
+51,EmergencyService,yxs,yes
+73,Condition,hearx axxack,heart attack
+229,Condition,heart faxlure,heart failure
+101,MeasureCode,hfx1,hf-1
+120,MeasureCode,axi-2,ami-2
+219,MeasureName,heartxattackxpatientsxgivenxaspirinxatxarrival,heart attack patients given aspirin at arrival
+290,MeasureName,all heart surgerx patients whose blood sugar (blood glucose) is kept under good control in the daxs right after surgerx,all heart surgery patients whose blood sugar (blood glucose) is kept under good control in the days right after surgery
+158,Score,9x%,98%
+237,Score,9x%,97%
+91,Sample,619 paxienxs,619 patients
+224,Sample,1 patiexts,1 patients
+69,Stateavg,al_amx-1,al_ami-1
+213,Stateavg,al_sxip-inf-2,al_scip-inf-2

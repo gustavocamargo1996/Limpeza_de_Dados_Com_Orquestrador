@@ -160,6 +160,11 @@ real o gabarito não existe):
 
 O guia vai para `dados/guia/<nome>/`, com semente fixa.
 
+**Benchmarks prontos:** `benchmark/` traz cinco datasets da literatura (`beers`,
+`environment`, `flights`, `hospital` e `rayyan`, com 300 linhas cada), cada um com o
+`sujo.csv`, o guia e o `limpo.csv`, e os comandos para gerar e medir. Veja
+`benchmark/LEIA-ME.md`.
+
 ---
 
 ## 3. O orquestrador

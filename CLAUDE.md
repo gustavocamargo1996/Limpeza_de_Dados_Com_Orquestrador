@@ -158,6 +158,12 @@ em **15 arquivos e 1.571 linhas**, contra 14 e 1.400, com o maior em 200
 função: o `fluxo.py` único tinha 294 linhas. As linhas a mais estão nas cinco
 telas, que eu tinha estimado por baixo.
 
+**Linux e macOS (05/11/2026):** o orquestrador foi a **1.597 linhas** (+26, todas em
+`geracao.py`, que tem 157): fora do Windows, o processo vivo passa a ser lido pelo
+`ps` (que o macOS também tem, ao contrário do `/proc`), e o encerrar mata o grupo do
+filho. O gerador foi a **1.884** (+5): o CSV dentro do prompt usa sempre o mesmo fim
+de linha (`docs/DECISOES.md#prompt-igual-em-todo-sistema`).
+
 Meça antes de todo commit que acrescenta código:
 
 ```bash

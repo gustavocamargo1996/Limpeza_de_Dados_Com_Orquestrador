@@ -9,6 +9,9 @@ from limpeza2 import config
 
 # Falhas transitorias que o SDK ja tentou de novo; viram FalhaDoLLM("rede").
 _REDE = (openai.APIConnectionError, openai.RateLimitError, openai.InternalServerError)
+# Fim de linha de tabela dentro de prompt, igual em todo sistema: o prompt e a chave
+# das respostas gravadas. Ver docs/DECISOES.md#prompt-igual-em-todo-sistema.
+FIM_DE_LINHA = "\r\n"
 _atual = None
 
 

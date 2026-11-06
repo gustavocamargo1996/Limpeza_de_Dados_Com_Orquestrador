@@ -95,7 +95,7 @@ def _sujeito(entrada):
                "properties": {"coluna": {"type": ["string", "null"], "enum": [*candidatas, None]},
                               "raciocinio": {"type": "string"}}}
     conteudo = (f"colunas: {list(entrada.sujo.columns)}\ncandidatas: {candidatas}\n"
-                f"linhas:\n{entrada.sujo.head(10).to_csv()}")
+                f"linhas:\n{entrada.sujo.head(10).to_csv(lineterminator=provedor.FIM_DE_LINHA)}")
     try:
         resposta = provedor.cliente().pedir_json(
             "residual", "coluna_sujeito", INSTRUCAO_SUJEITO, conteudo, esquema)
@@ -114,4 +114,5 @@ def _conteudo(entrada, lote, pedidos):
     for coluna in sorted({c for c, _ in pedidos}):
         linhas += [f"exemplo do guia em {coluna}: {s!r} -> {limpo!r}"
                    for s, limpo in exemplos_do_guia(entrada, coluna)]
-    return "\n".join(linhas) + "\nlinhas da entidade:\n" + entrada.sujo.loc[lote].to_csv()
+    lote_csv = entrada.sujo.loc[lote].to_csv(lineterminator=provedor.FIM_DE_LINHA)
+    return "\n".join(linhas) + "\nlinhas da entidade:\n" + lote_csv

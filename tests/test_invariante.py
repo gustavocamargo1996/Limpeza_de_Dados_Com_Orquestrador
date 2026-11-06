@@ -1,5 +1,8 @@
 """Invariante: os numeros do limpador congelado e a geracao a partir das respostas congeladas."""
+import os
 from pathlib import Path
+
+import pytest
 
 from limpeza2 import config
 from limpeza2.espinha import gerar_limpador
@@ -29,7 +32,10 @@ def test_numeros_do_limpador_congelado():
     assert (r["colunas"]["brewery-name"]["mudancas"], r["colunas"]["brewery_id"]["mudancas"]) == (5, 1)
 
 
-def test_geracao_a_partir_das_respostas_reproduz_o_limpador(tmp_path, monkeypatch):
+# O pandas usa os.linesep no to_csv sem arquivo: "\r\n" simula o Windows; "\n", Linux e macOS.
+@pytest.mark.parametrize("fim_de_linha", ["\r\n", "\n"], ids=["windows", "posix"])
+def test_geracao_a_partir_das_respostas_reproduz_o_limpador(tmp_path, monkeypatch, fim_de_linha):
+    monkeypatch.setattr(os, "linesep", fim_de_linha)
     monkeypatch.setattr(config, "PROVEDOR", "gravado")
     monkeypatch.setattr(config, "RESPOSTAS_GRAVADAS", str(FIXTURES / "respostas_beers_poc2.jsonl"))
     caminho = gerar_limpador(SUJO, GUIA, tmp_path / PASTA_DO_RUN)

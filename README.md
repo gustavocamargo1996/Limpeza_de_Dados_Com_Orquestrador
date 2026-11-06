@@ -19,10 +19,9 @@ O gerador roda sozinho, pela linha de comando. O orquestrador o chama em subproc
 
 ### Requisitos
 
-- **Windows ou Linux.** Os comandos deste README são do Windows (PowerShell); os do
-  Linux estão na seção 1.1. **No macOS, o painel do orquestrador não acompanha a
-  geração** (a verificação de processo vivo usa `/proc`); o resto segue os comandos do
-  Linux.
+- **Windows, Linux ou macOS.** A suíte de testes passa no Windows e no Linux (Ubuntu).
+  O macOS usa o mesmo código do Linux. Os comandos deste README são do Windows
+  (PowerShell); os do Linux e do macOS estão na seção 1.1.
 - **Git.**
 - **[uv](https://docs.astral.sh/uv/)**, que gerencia o Python e o ambiente virtual.
 - **Python 3.14**, a única versão testada. O `uv` o baixa se faltar.
@@ -118,8 +117,8 @@ unset PROVEDOR RESPOSTAS_GRAVADAS   # volta a valer o que está no .env
 ```
 
 O `export` vale só para o terminal aberto. Para o orquestrador (seção 3), o
-`subir_seaweed.cmd` é só do Windows. No Linux, baixe o `weed` para Linux na mesma
-página de releases e, da raiz do repositório, num terminal que fica aberto:
+`subir_seaweed.cmd` é só do Windows. No Linux e no macOS, baixe o `weed` do seu sistema
+na mesma página de releases e, da raiz do repositório, num terminal que fica aberto:
 
 ```bash
 mkdir -p var/seaweed

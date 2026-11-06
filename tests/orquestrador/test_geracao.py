@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import time
+import types
 from pathlib import Path
 
 from orquestrador import geracao
@@ -60,6 +61,9 @@ def test_disparo_real_offline_reproduz_o_mvp(tmp_path, monkeypatch):
     monkeypatch.setenv("RESPOSTAS_GRAVADAS", str(FIXTURES / "respostas_beers_poc2.jsonl"))
     destino = tmp_path / "beers_2026-10-12_2152"
     filho = geracao.disparar(FIXTURES / "beers_dirty_300.csv", RAIZ / "dados" / "guia" / "beers", destino)
+    if os.name != "nt":
+        # Sessao propria: o encerrar mata o grupo do filho, e so ele.
+        assert os.getpgid(filho.pid) == filho.pid != os.getpgid(0)
     assert geracao.situacao(destino, filho.pid) in ("rodando", "ok")
     filho.wait(timeout=600)
     time.sleep(0.2)
@@ -101,6 +105,63 @@ def test_vivo_confere_a_hora_de_criacao_contra_pid_reaproveitado():
     assert not geracao.vivo(filho.pid, agora - 3600)
     geracao.encerrar(filho.pid)
     filho.wait(timeout=30)
+
+
+def test_vivo_posix_le_o_estado_e_a_idade_que_o_ps_informa(monkeypatch):
+    saida = {}
+    monkeypatch.setattr(geracao.subprocess, "run",
+                        lambda *a, **k: types.SimpleNamespace(stdout=saida["ps"]))
+    agora = time.time()
+    saida["ps"] = "Ss   1-02:03:04\n"
+    nascido = agora - (86400 + 2 * 3600 + 3 * 60 + 4)
+    assert geracao._vivo_posix(1, nascido) and geracao._vivo_posix(1, None)
+    assert not geracao._vivo_posix(1, nascido - 3600)
+    saida["ps"] = "R+ 05:00"
+    assert geracao._vivo_posix(1, agora - 300) and not geracao._vivo_posix(1, agora)
+    saida["ps"] = "Z 00:03"
+    assert not geracao._vivo_posix(1, None)
+    saida["ps"] = ""
+    assert not geracao._vivo_posix(1, None)
+
+
+def test_filho_que_terminou_sem_ser_esperado_nao_conta_como_vivo():
+    # Sem wait, no Linux e no macOS o filho fica zumbi: listado, mas encerrado.
+    filho = subprocess.Popen([sys.executable, "-c", "pass"])
+    prazo = time.time() + 30
+    while geracao.vivo(filho.pid) and time.time() < prazo:
+        time.sleep(0.1)
+    assert not geracao.vivo(filho.pid)
+    filho.wait()
+
+
+def test_encerrar_leva_junto_os_processos_do_filho(tmp_path):
+    arquivo = tmp_path / "neto.pid"
+    codigo = ("import os, subprocess, sys, time\n"
+              "neto = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
+              f"open({str(arquivo) + '.tmp'!r}, 'w').write(str(neto.pid))\n"
+              f"os.replace({str(arquivo) + '.tmp'!r}, {str(arquivo)!r})\n"
+              "time.sleep(60)\n")
+    filho = subprocess.Popen([sys.executable, "-c", codigo], start_new_session=True)
+    prazo = time.time() + 60
+    while not arquivo.exists() and time.time() < prazo:
+        time.sleep(0.1)
+    neto = int(arquivo.read_text())
+    assert geracao.vivo(neto)
+    geracao.encerrar(filho.pid)
+    filho.wait(timeout=30)
+    prazo = time.time() + 30
+    while geracao.vivo(neto) and time.time() < prazo:
+        time.sleep(0.1)
+    assert not geracao.vivo(neto)
+
+
+def test_situacao_olha_a_conclusao_antes_do_processo(tmp_path):
+    destino = tmp_path / "v1"
+    geracao.log(destino).write_text(f"{geracao.SUCESSO}limpador.py\n", encoding="utf-8")
+    # O processo segue listado (aqui, o proprio teste), mas o filho ja anunciou o fim.
+    assert geracao.situacao(destino, os.getpid()) == "ok"
+    geracao.log(destino).write_text("trabalhando\n", encoding="utf-8")
+    assert geracao.situacao(destino, os.getpid()) == "rodando"
 
 
 def test_falha_de_rede_gravada_conta_como_chamada_nova(tmp_path):

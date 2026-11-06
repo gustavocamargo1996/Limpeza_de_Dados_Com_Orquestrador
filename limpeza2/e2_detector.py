@@ -92,7 +92,8 @@ def _conteudo(entrada, coluna, tipos, caso):
     linhas += [f"par minerado: {det} -> {coluna} {_arredondado(numeros)}"
                for (det, alvo), numeros in entrada.perfil.pares.items() if alvo == coluna]
     linhas += [f"exemplo do guia: {s!r} -> {c!r}" for s, c in exemplos_do_guia(entrada, coluna)]
-    guia = entrada.guia_linhas.to_csv() if len(entrada.guia_linhas) else "nenhuma\n"
+    guia = (entrada.guia_linhas.to_csv(lineterminator=provedor.FIM_DE_LINHA)
+            if len(entrada.guia_linhas) else "nenhuma\n")
     return "\n".join(linhas) + "\nlinhas corrigidas do guia:\n" + guia
 
 

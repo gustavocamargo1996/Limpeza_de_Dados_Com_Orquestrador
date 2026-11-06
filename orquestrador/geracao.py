@@ -2,8 +2,10 @@
 import ctypes
 import json
 import os
+import signal
 import subprocess
 import sys
+import time
 from collections import Counter
 from pathlib import Path
 
@@ -40,8 +42,9 @@ def disparar(sujo, pasta_guia, destino, reaproveitar=None):
                   str(pasta_guia or ""), str(destino)]
     with log(destino).open("w", encoding="utf-8") as saida:
         # Lista de argumentos, sem shell: nada e reinterpretado no caminho.
+        # Sessao nova (ignorada no Windows): o encerrar mata o grupo inteiro.
         return subprocess.Popen(argumentos, cwd=config.RAIZ, env=ambiente(reaproveitar),
-                                stdout=saida, stderr=subprocess.STDOUT)
+                                stdout=saida, stderr=subprocess.STDOUT, start_new_session=True)
 
 
 def _registros(arquivo):
@@ -81,10 +84,25 @@ def chamadas(destino, anterior=None):
     return len(chaves), novas
 
 
+def _vivo_posix(pid, nascido):
+    """No Linux e no macOS, pelo ps: zumbi conta como encerrado, e o etime da a idade."""
+    saida = subprocess.run(["ps", "-o", "stat=", "-o", "etime=", "-p", str(pid)],
+                           capture_output=True, text=True).stdout.split()
+    if len(saida) < 2 or saida[0].startswith("Z"):
+        return False
+    # etime e [[dd-]hh:]mm:ss, o tempo desde que o processo nasceu.
+    dias, _, relogio = saida[1].rpartition("-")
+    decorrido = 0
+    for parte in relogio.split(":"):
+        decorrido = decorrido * 60 + int(parte)
+    decorrido += int(dias or 0) * 86400
+    return nascido is None or abs(time.time() - decorrido - nascido) < 60
+
+
 def vivo(pid, nascido=None):
     """O processo `pid` ainda roda e, com `nascido`, foi criado ate um minuto antes ou depois."""
     if os.name != "nt":
-        return Path(f"/proc/{pid}").exists()
+        return _vivo_posix(pid, nascido)
     # Nunca os.kill(pid, 0): no Windows o sinal 0 e CTRL_C_EVENT.
     kernel = ctypes.windll.kernel32
     alca = kernel.OpenProcess(0x1000, False, pid)
@@ -103,8 +121,15 @@ def encerrar(pid):
     """Encerra o filho e os processos dele."""
     if os.name == "nt":
         subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True)
-    else:
-        os.kill(pid, 9)
+        return
+    try:
+        # O disparar abre sessao nova: o grupo do filho leva junto os processos dele.
+        if os.getpgid(pid) == pid:
+            os.killpg(pid, signal.SIGKILL)
+        else:
+            os.kill(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass  # o processo ja tinha terminado: nada a encerrar
 
 
 def erro(destino):
@@ -115,12 +140,13 @@ def erro(destino):
 
 
 def situacao(destino, pid, nascido=None):
-    """`rodando`, `ok` (o filho imprimiu o limpador) ou `erro`."""
-    if vivo(pid, nascido):
-        return "rodando"
+    """`ok` (o filho imprimiu o limpador), `rodando` ou `erro`."""
     arquivo = log(destino)
     texto = arquivo.read_text(encoding="utf-8", errors="replace") if arquivo.exists() else ""
-    return "ok" if any(linha.startswith(SUCESSO) for linha in texto.splitlines()) else "erro"
+    # O sinal de conclusao vem antes: o filho que ja terminou pode seguir listado.
+    if any(linha.startswith(SUCESSO) for linha in texto.splitlines()):
+        return "ok"
+    return "rodando" if vivo(pid, nascido) else "erro"
 
 
 if __name__ == "__main__":

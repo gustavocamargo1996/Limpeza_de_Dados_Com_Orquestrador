@@ -693,3 +693,26 @@ chamadas.
 **Duas travas.** `PROVEDOR_VIVO` desconhecido falha alto, pela mesma razão de
 privacidade do `#provedor`. E `MODELO` diferente do modelo gravado na origem falha
 alto: uma versão com respostas de dois modelos seria inexplicável.
+
+---
+
+## O prompt é igual em todo sistema {#prompt-igual-em-todo-sistema}
+
+**Decisão.** Toda tabela que entra num prompt como CSV (as linhas do guia no
+detector; as linhas da entidade e a amostra da coluna-sujeito no residual) usa
+sempre `\r\n` como fim de linha, pela constante `provedor.FIM_DE_LINHA`.
+
+**Por quê.** A chave de cada resposta gravada é o hash do prompt. O `to_csv()` do
+pandas sem arquivo usa `os.linesep`: `\r\n` no Windows, `\n` no Linux e no macOS.
+As respostas do MVP foram gravadas no Windows, e num Mac o primeiro prompt do
+detector já tinha outra chave. O `gravado` falhava com `resposta nao gravada`, e o
+`reaproveitar` mandava à API viva prompts que já tinham resposta (15 em vez de 2 no
+teste). Achado em 05/11/2026, no Mac de quem experimentava o projeto.
+
+**Por que `\r\n` e não `\n`.** É o que as respostas gravadas viram. Com `\n`, o
+invariante deixaria de reproduzir byte a byte, e as respostas de toda geração
+gravada no Windows ficariam inúteis em qualquer sistema. O LLM lê os dois do mesmo
+jeito.
+
+**Como se prova.** O teste do invariante roda duas vezes, com `os.linesep` de
+Windows e de Linux, e o limpador tem de sair igual nas duas.
